@@ -4,6 +4,8 @@ Inspired by [es-module-lexer](https://github.com/guybedford/es-module-lexer)
 
 A JS module syntax lexer in Rust
 
+## WIP ----
+
 ### Usage
 
 ```
