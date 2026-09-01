@@ -1,0 +1,23 @@
+{
+  "name": "rust-es-module-lexer",
+  "version": "1.0.0",
+  "description": "Inspired by [es-module-lexer](https://github.com/guybedford/es-module-lexer)",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fi2zz/rust-es-module-lexer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Fi2zz/rust-es-module-lexer/issues"
+  },
+  "homepage": "https://github.com/Fi2zz/rust-es-module-lexer#readme",
+  "devDependencies": {
+    "es-module-lexer": "^2.3.2"
+  }
+}
