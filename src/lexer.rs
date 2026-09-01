@@ -189,9 +189,10 @@ pub fn readToWsOrPunctuator(ch: i32) -> i32 {
 }
 
 /*
- * Ported from Acorn (MIT License, Copyright (C) 2012-2020 by various
- * contributors) — same as the reference lexer.js. Used to emulate the
- * wrapper's eval() decoding of string / no-substitution template literals.
+ * Based on the Acorn string reader (MIT License, Copyright (C) 2012-2020 by
+ * various contributors), adapted to emulate the wrapper's sloppy-mode eval()
+ * decoding of string / no-substitution template literals: quoted strings allow
+ * octal escapes, template literals normalize line endings and reject octal.
  */
 // start AT the opening quote ('"'), end one past the closing quote;
 // returns None where JS eval would throw
@@ -203,6 +204,9 @@ pub fn evalLiteral(start: i32, _end: i32) -> Option<String> {
 
 #[allow(non_snake_case)]
 pub fn readString(start: i32, quote: i32) -> String {
+    // quote == 96: template literal; the escape/line-break rules then follow
+    // eval() semantics for templates (no octal, line endings normalized)
+    let template = quote == 96;
     unsafe {
         acornPos = start;
     }
@@ -220,13 +224,22 @@ pub fn readString(start: i32, quote: i32) -> String {
         // '\'
         if ch == 92 {
             pushChunk(&mut out, chunkStart, acorn_pos);
-            out.extend(readEscapedChar());
+            out.extend(readEscapedChar(template));
             chunkStart = unsafe { acornPos };
         } else if ch == 0x2028 || ch == 0x2029 {
             unsafe { acornPos += 1 };
+        } else if template && ch == 13 {
+            // template literals normalize \r\n and lone \r to \n
+            pushChunk(&mut out, chunkStart, acorn_pos);
+            out.push(10);
+            unsafe { acornPos += 1 };
+            if source::charCodeAt(unsafe { acornPos }) == 10 {
+                unsafe { acornPos += 1 };
+            }
+            chunkStart = unsafe { acornPos };
         } else {
             // raw line breaks are only permitted inside template literals
-            if helper::isBr(ch) && quote != 96 {
+            if helper::isBr(ch) && !template {
                 helper::syntaxError();
             }
             unsafe { acornPos += 1 };
@@ -243,9 +256,11 @@ fn pushChunk(out: &mut Vec<u16>, start: i32, end: i32) {
     out.extend(source::units(start, end));
 }
 
-// Used to read escaped characters
+// Used to read escaped characters. Sloppy-mode eval semantics for quoted
+// strings (octal escapes allowed); template literals reject \8, \9 and octal
+// escapes (eval throws, the caller maps that to None).
 #[allow(non_snake_case)]
-fn readEscapedChar() -> Vec<u16> {
+fn readEscapedChar(template: bool) -> Vec<u16> {
     unsafe { acornPos += 1 };
     let ch = source::charCodeAt(unsafe { acornPos });
     unsafe { acornPos += 1 };
@@ -265,9 +280,18 @@ fn readEscapedChar() -> Vec<u16> {
             return vec![];
         }
         10 => return vec![], // ' \n'
-        56 | 57 => helper::syntaxError(),
+        // '\8' / '\9': literal chars in sloppy strings, errors in templates
+        56 | 57 => {
+            if template {
+                helper::syntaxError();
+            }
+            return vec![ch as u16];
+        }
         _ => {
             if ch >= 48 && ch <= 55 {
+                if template {
+                    helper::syntaxError();
+                }
                 return readOctalChar();
             }
             if helper::isBr(ch) {
@@ -280,7 +304,9 @@ fn readEscapedChar() -> Vec<u16> {
     }
 }
 
-// octal escape: up to 3 chars [0-7] starting at acornPos - 1
+// sloppy-mode octal escape: up to 3 chars [0-7] starting at acornPos - 1; when
+// the 3-digit value exceeds 255 only the first 2 digits form the escape (the
+// last digit stays a normal char)
 #[allow(non_snake_case)]
 fn readOctalChar() -> Vec<u16> {
     let first = unsafe { acornPos } - 1;
@@ -303,11 +329,6 @@ fn readOctalChar() -> Vec<u16> {
         octal >>= 3;
     }
     unsafe { acornPos += octalStrLen - 1 };
-    let ch = source::charCodeAt(unsafe { acornPos });
-    let onlyZero = octalStrLen == 1 && source::charCodeAt(first) == 48;
-    if !onlyZero || ch == 56 || ch == 57 {
-        helper::syntaxError();
-    }
     return vec![octal as u16];
 }
 

@@ -914,5 +914,57 @@
   {
     "name": "upstream_228",
     "source": "import { name } from 'mod\\u1011';\nimport json from './json.json' assert { type: 'json' }\nexport var p = 5;\nexport function q () {\n\n};\n\n// Comments provided to demonstrate edge cases\nimport /*comment!*/ (  'asdf', { assert: { type: 'json' }});\nimport /*comment!*/.meta.asdf;"
+  },
+  {
+    "name": "upstream_229",
+    "source": "import \"\\1\";"
+  },
+  {
+    "name": "upstream_230",
+    "source": "import \"\\12\";"
+  },
+  {
+    "name": "upstream_231",
+    "source": "import \"\\123\";"
+  },
+  {
+    "name": "upstream_232",
+    "source": "import \"\\400\";"
+  },
+  {
+    "name": "upstream_233",
+    "source": "import \"\\08\";"
+  },
+  {
+    "name": "upstream_234",
+    "source": "import \"\\8\";"
+  },
+  {
+    "name": "upstream_235",
+    "source": "import \"\\9\";"
+  },
+  {
+    "name": "upstream_236",
+    "source": "import \"\\0\";"
+  },
+  {
+    "name": "upstream_237",
+    "source": "import(\"\\1\");"
+  },
+  {
+    "name": "upstream_238",
+    "source": "import(`a\r\nb`);"
+  },
+  {
+    "name": "upstream_239",
+    "source": "import(`a\rb`);"
+  },
+  {
+    "name": "upstream_240",
+    "source": "import(`\\1`);"
+  },
+  {
+    "name": "upstream_241",
+    "source": "import(`a\\`b`);"
   }
 ]
