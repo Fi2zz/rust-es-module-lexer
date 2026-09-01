@@ -384,6 +384,8 @@ fn readCodePointToString() -> Vec<u16> {
         unsafe { acornPos += 1 };
         let close = indexOfCloseBrace(unsafe { acornPos });
         match close {
+            // 空码点 \u{}：eval 抛 Invalid Unicode escape sequence，不能解成 \0
+            Some(close) if close == unsafe { acornPos } => helper::syntaxError(),
             Some(close) => {
                 code = readHexChar(close - unsafe { acornPos });
             }

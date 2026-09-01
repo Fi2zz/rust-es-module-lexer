@@ -206,5 +206,53 @@
   {
     "name": "dynamic_template_escaped_backtick",
     "source": "import(`a\\`b`);"
+  },
+  {
+    "name": "hex_escape_short",
+    "source": "import \"\\x4\";"
+  },
+  {
+    "name": "hex_escape_bare",
+    "source": "import \"\\x\";"
+  },
+  {
+    "name": "hex_escape_invalid",
+    "source": "import \"\\xg\";"
+  },
+  {
+    "name": "unicode_escape_short",
+    "source": "import \"\\u123\";"
+  },
+  {
+    "name": "unicode_escape_invalid",
+    "source": "import \"\\uzzzz\";"
+  },
+  {
+    "name": "codepoint_empty",
+    "source": "import \"\\u{}\";"
+  },
+  {
+    "name": "codepoint_out_of_range",
+    "source": "import \"\\u{110000}\";"
+  },
+  {
+    "name": "codepoint_emoji",
+    "source": "import \"\\u{1f600}\";"
+  },
+  {
+    "name": "surrogate_pair",
+    "source": "import \"\\ud83d\\ude00\";"
+  },
+  {
+    "name": "template_hex_short",
+    "source": "import(`\\x4`);"
+  },
+  {
+    "name": "template_unicode_short",
+    "source": "import(`\\u123`);"
+  },
+  {
+    "name": "template_codepoint_emoji",
+    "source": "import(`\\u{1f600}`);"
   }
 ]

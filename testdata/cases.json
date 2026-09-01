@@ -966,5 +966,53 @@
   {
     "name": "upstream_241",
     "source": "import(`a\\`b`);"
+  },
+  {
+    "name": "upstream_242",
+    "source": "import \"\\x4\";"
+  },
+  {
+    "name": "upstream_243",
+    "source": "import \"\\x\";"
+  },
+  {
+    "name": "upstream_244",
+    "source": "import \"\\xg\";"
+  },
+  {
+    "name": "upstream_245",
+    "source": "import \"\\u123\";"
+  },
+  {
+    "name": "upstream_246",
+    "source": "import \"\\uzzzz\";"
+  },
+  {
+    "name": "upstream_247",
+    "source": "import \"\\u{}\";"
+  },
+  {
+    "name": "upstream_248",
+    "source": "import \"\\u{110000}\";"
+  },
+  {
+    "name": "upstream_249",
+    "source": "import \"\\u{1f600}\";"
+  },
+  {
+    "name": "upstream_250",
+    "source": "import \"\\ud83d\\ude00\";"
+  },
+  {
+    "name": "upstream_251",
+    "source": "import(`\\x4`);"
+  },
+  {
+    "name": "upstream_252",
+    "source": "import(`\\u123`);"
+  },
+  {
+    "name": "upstream_253",
+    "source": "import(`\\u{1f600}`);"
   }
 ]
