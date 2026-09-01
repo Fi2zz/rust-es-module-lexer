@@ -1,139 +1,68 @@
 # ES Module Lexer in Rust
 
-Inspired by [es-module-lexer](https://github.com/guybedford/es-module-lexer)
+A Rust port of [es-module-lexer](https://github.com/guybedford/es-module-lexer),
+behavior-aligned with upstream **2.3.2** (verified against its WASM build), with
+one deliberate extension: **JSX source files are supported**.
 
-A JS module syntax lexer in Rust
+Designed for fast import/export extraction from JS and JSX sources — no full
+parse, no AST, just the module syntax.
 
-## WIP ----
+## Usage
 
-### Usage
+```rust
+use rust_demo::{parse, source};
 
-```
-npm install es-module-lexer
-```
+source::setSource("import mod from \"module\";\nexport var p = 5;");
+let (imports, exports, facade) = parse::parse();
 
-For use in CommonJS:
-
-```js
-const { init, parse } = require("es-module-lexer");
-
-(async () => {
-	// either await init, or call parse asynchronously
-	// this is necessary for the Web Assembly boot
-	await init;
-
-	const [imports, exports] = parse("export var p = 5");
-	exports[0] === "p";
-})();
+assert_eq!(imports[0].n.as_deref(), Some("module"));
+assert_eq!(exports[0].n.as_deref(), Some("p"));
 ```
 
-An ES module version is also available:
+Positions are UTF-16 code unit offsets into the source, matching upstream.
+On invalid source the lexer panics (`Parse error`); wrap with
+`std::panic::catch_unwind` if you need to handle that gracefully.
 
-```js
-import { init, parse } from "es-module-lexer";
+To inspect a file from the command line:
 
-(async () => {
-	await init;
-
-	const source = `
-    import { name } from 'mod\\u1011';
-    import json from './json.json' assert { type: 'json' }
-    export var p = 5;
-    export function q () {
-
-    };
-
-    // Comments provided to demonstrate edge cases
-    import /*comment!*/ (  'asdf', { assert: { type: 'json' }});
-    import /*comment!*/.meta.asdf;
-  `;
-
-	const [imports, exports] = parse(source, "optional-sourcename");
-
-	// Returns "modထ"
-	imports[0].n;
-	// Returns "mod\u1011"
-	source.substring(imports[0].s, imports[0].e);
-	// "s" = start
-	// "e" = end
-
-	// Returns "import { name } from 'mod'"
-	source.substring(imports[0].ss, imports[0].se);
-	// "ss" = statement start
-	// "se" = statement end
-
-	// Returns "{ type: 'json' }"
-	source.substring(imports[1].a, imports[1].se);
-	// "a" = assert, -1 for no assertion
-
-	// Returns "p,q"
-	exports.toString();
-
-	// Dynamic imports are indicated by imports[2].d > -1
-	// In this case the "d" index is the start of the dynamic import bracket
-	// Returns true
-	imports[2].d > -1;
-
-	// Returns "asdf" (only for string literal dynamic imports)
-	imports[2].n;
-	// Returns "import /*comment!*/ (  'asdf', { assert: { type: 'json' } })"
-	source.substring(imports[2].ss, imports[2].se);
-	// Returns "'asdf'"
-	source.substring(imports[2].s, imports[2].e);
-	// Returns "(  'asdf', { assert: { type: 'json' } })"
-	source.substring(imports[2].d, imports[2].se);
-	// Returns "{ assert: { type: 'json' } }"
-	source.substring(imports[2].a, imports[2].se - 1);
-
-	// For non-string dynamic import expressions:
-	// - n will be undefined
-	// - a is currently -1 even if there is an assertion
-	// - e is currently the character before the closing )
-
-	// For nested dynamic imports, the se value of the outer import is -1 as end tracking does not
-	// currently support nested dynamic immports
-
-	// import.meta is indicated by imports[2].d === -2
-	// Returns true
-	imports[2].d === -2;
-	// Returns "import /*comment!*/.meta"
-	source.substring(imports[2].s, imports[2].e);
-	// ss and se are the same for import meta
-})();
+```sh
+cargo run --example parse_file -- path/to/file.jsx   # prints JSON
 ```
 
-### Escape Sequences
+## Output Format
 
-To handle escape sequences in specifier strings, the `.n` field of imported specifiers will be provided where possible.
+### Imports
 
-For dynamic import expressions, this field will be empty if not a valid JS string.
+| Field | Meaning |
+|-------|---------|
+| `n` | Specifier string with escapes decoded (`None` if not a safe literal) |
+| `t` | Phase type: 1 static, 2 dynamic `import()`, 3 `import.meta`, 4 `import source`, 5 `import.source()`, 6 `import defer`, 7 `import.defer()` |
+| `ss` / `se` | Statement start / end |
+| `s` / `e` | Specifier start / end (inside the quotes) |
+| `a` | Start of the attributes object, -1 when absent |
+| `d` | -1 static, -2 `import.meta`, otherwise position of the dynamic import `(` |
+| `at` | Import attributes as `[[key, value], ...]` (`with { type: 'json' }`), `None` when absent |
 
-### Facade Detection
+### Exports
 
-Facade modules that only use import / export syntax can be detected via the third return value:
+| Field | Meaning |
+|-------|---------|
+| `n` / `ln` | Exported name / local name (`ln` is `None` for reexports) |
+| `s` / `e` | Exported name start / end |
+| `ls` / `le` | Local name start / end (-1 when there is no local name) |
+| `ss` | Export statement start |
 
-```js
-const [, , facade] = parse(`
-  export * from 'external';
-  import * as ns from 'external2';
-  export { a as b } from 'external3';
-  export { ns };
-`);
-facade === true;
-```
+### Facade
 
-### Grammar Support
+`facade` is `true` when the module only uses import/export syntax (a pure
+reexport shim), which allows such modules to be skipped when bundling.
 
-- Token state parses all line comments, block comments, strings, template strings, blocks, parens and punctuators.
-- Division operator / regex token ambiguity is handled via backtracking checks against punctuator prefixes, including closing brace or paren backtracking.
-- Always correctly parses valid JS source, but may parse invalid JS source without errors.
-
-### JSX Support
+## JSX Support
 
 Unlike upstream es-module-lexer, JSX is supported and always enabled (no flag).
 Rationale: in valid JS, `<` as a binary operator always follows a value token,
 so a `<` in expression position (the same positions where a regex can start)
-cannot occur in valid JS — it can only be JSX. The 254-case baseline (valid JS)
+cannot occur in valid JS — it can only be JSX. The upstream baseline (valid JS)
 serves as the no-regression guard for this rule.
 
 The JSX scanner only guarantees: no parse errors, correct top-level
@@ -145,29 +74,44 @@ Expression containers `{...}` (including spread attributes) reuse the main
 brace-stack machinery, so strings, templates with `${...}`, comments, regexes
 and nested JSX inside containers are all lexed normally.
 
-### Limitations
+## Performance
 
-The lexing approach is designed to deal with the full language grammar including RegEx / division operator ambiguity through backtracking and paren / brace tracking.
+Roughly **1.4x the upstream WASM build** on the upstream sample corpus
+(angular/d3/rollup/magic-string + minified, 3 MB total, ~3.9ms vs ~5.5ms,
+average of 25 runs per file). To reproduce:
 
-- TSX-style generic parameters are not supported: `useRef<T>(null)` is safe
-  (its `<` follows an identifier, so it reads as comparison), but
-  `const f = <T>(v) => v` enters JSX at `<` and may swallow the rest of the
-  file as JSX content.
-- Unterminated JSX at EOF is tolerated (scanning stops silently, no error).
-
-The only limitation to the reduced parser is that the "exports" list may not correctly gather all export identifiers in the following edge cases:
-
-```js
-// Only "a" is detected as an export, "q" isn't
-export var a = "asdf",
-	q = z;
-
-// "b" is not detected as an export
-export var { a: b } = asdf;
+```sh
+cargo build --release --example bench
+./target/release/examples/bench .upstream-ref/test/samples/*.js
+node scripts/bench_upstream.cjs .upstream-ref/test/samples/*.js
 ```
 
-The above cases are handled gracefully in that the lexer will keep going fine, it will just not properly detect the export names above.
+## Development
 
-### License
+The test suite asserts field-by-field equality against the real upstream
+behavior, captured from its WASM build:
+
+- `cargo test` — 254 baseline cases (190 extracted from upstream's own
+  `test/_unit.cjs` + 64 edge cases) plus 24 JSX cases
+- `node scripts/extract_upstream_cases.mjs` — regenerate `testdata/cases.json`
+  / `testdata/expected.json` (runs upstream's test suite with mocha stubs and
+  records every `parse` call; requires `npm install` first)
+- `node scripts/diff_samples.mjs <files...>` — full-output diff against
+  upstream on real-world files
+
+The benchmark and sample diffs need the upstream repo checked out locally:
+`git clone --depth 1 https://github.com/guybedford/es-module-lexer .upstream-ref`
+
+### Limitations
+
+- **TS/TSX is explicitly out of scope.** Plain `.tsx` type syntax is not
+  handled. `useRef<T>(null)` is safe by accident (the `<` follows an
+  identifier), but `const f = <T>(v) => v` enters JSX mode at `<` and may
+  swallow the rest of the file.
+- Unterminated JSX at EOF is tolerated silently.
+- `assert { ... }` import syntax is not recognized (upstream dropped it in
+  favor of `with { ... }` in 2.x).
+
+## License
 
 MIT
