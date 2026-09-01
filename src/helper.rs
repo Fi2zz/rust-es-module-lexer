@@ -2,8 +2,11 @@ use crate::position;
 use crate::source;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Import {
-    /// name (None = undefined)
+    /// name (None = undefined / not a safe specifier)
     pub n: Option<String>,
+    // phase type: 1=Static 2=Dynamic 3=ImportMeta 4=StaticSource 5=DynamicSource
+    //   6=StaticDefer 7=DynamicDefer
+    pub t: i32,
     // statement start
     pub ss: i32,
     // statement end
@@ -12,16 +15,32 @@ pub struct Import {
     pub s: i32,
     // end
     pub e: i32,
-    // "a" = assert, -1 for no assertion
+    // "a" = attribute index, -1 for no attributes
     pub a: i32,
+    // -1 static, -2 import.meta, otherwise pos of the dynamic import '('
     pub d: i32,
+    // import attributes [[key, value], ...] (None = none)
+    pub at: Option<Vec<(String, String)>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Export {
+    // exported name start/end
+    pub s: i32,
+    pub e: i32,
+    // local name start/end (-1 when there is no local name, e.g. reexports)
+    pub ls: i32,
+    pub le: i32,
+    // export statement start
+    pub ss: i32,
+    pub n: Option<String>,
+    pub ln: Option<String>,
 }
 
 pub type Imports = Vec<Import>;
-pub type Exports = Vec<String>;
+pub type Exports = Vec<Export>;
 pub type Facade = bool;
 pub type ParseResult = (Imports, Exports, Facade);
-pub type Source = Vec<u8>;
 
 #[allow(non_snake_case)]
 pub fn syntaxError() -> ! {
@@ -63,34 +82,88 @@ pub fn isBrOrWsOrPunctuatorNotDot(c: i32) -> bool {
     return c > 8 && c < 14 || c == 32 || c == 160 || isPunctuator(c) && c != 46/*.*/;
 }
 #[allow(non_snake_case)]
+pub fn isSpread(pos: i32) -> bool {
+    return source::charCodeAt(pos) == 46/*.*/
+        && source::charCodeAt(pos - 1) == 46
+        && source::charCodeAt(pos - 2) == 46;
+}
+#[allow(non_snake_case)]
+pub fn isBrOrWsOrPunctuatorOrSpreadNotDot(pos: i32) -> bool {
+    let c = source::charCodeAt(pos);
+    return c > 8 && c < 14 || c == 32 || c == 160 || isPunctuator(c) && (isSpread(pos) || c != 46);
+}
+#[allow(non_snake_case)]
+pub fn isQuote(ch: i32) -> bool {
+    return ch == 39/*'*/ || ch == 34/*"*/;
+}
+// Fold ASCII case; NBSP is the only non-ASCII whitespace recognized here.
+#[allow(non_snake_case)]
+pub fn isTokenRunChar(ch: i32) -> bool {
+    let folded = ((ch | 32) as u16).wrapping_sub(97) < 26;
+    let digit = (ch as u16).wrapping_sub(48) < 10;
+    return folded || digit
+        || ch == 36/*$*/ || ch == 95/*_*/ || ch == 92/*\*/
+        || ch > 127 && ch != 160;
+}
+// True for a char that can end a value. skipExpression uses this to tell
+// division from a regex: a '/' right after a value is division.
+#[allow(non_snake_case)]
+pub fn isValueChar(c: i32) -> bool {
+    return c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122
+        || c == 95/*_*/ || c == 36/*$*/ || c >= 128;
+}
+#[allow(non_snake_case)]
 pub fn keywordStart() -> bool {
     let pos = position::position();
-    return pos == 0 || isBrOrWsOrPunctuatorNotDot(source::charCodeAt(pos - 1));
+    return pos == 0 || isBrOrWsOrPunctuatorOrSpreadNotDot(pos - 1);
 }
 #[allow(non_snake_case)]
-fn readPrecedingKeyword(pos: i32, m: &str) -> bool {
-    if pos < m.len() as i32 - 1 {
+fn readPrecedingKeyword1(pos: i32, c1: i32) -> bool {
+    if pos < 0 {
         return false;
     }
-    return source::starts_with(m, pos - m.len() as i32 + 1)
-        && (pos == 0 || isBrOrWsOrPunctuatorNotDot(source::charCodeAt(pos - m.len() as i32)));
-}
-#[allow(non_snake_case)]
-fn readPrecedingKeyword1(pos: i32, ch: i32) -> bool {
-    return source::charCodeAt(pos) == ch
+    return source::charCodeAt(pos) == c1
         && (pos == 0 || isBrOrWsOrPunctuatorNotDot(source::charCodeAt(pos - 1)));
 }
+#[allow(non_snake_case)]
+pub fn readPrecedingKeywordn(pos: i32, m: &str) -> bool {
+    let n = m.len() as i32;
+    if pos - n + 1 < 0 {
+        return false;
+    }
+    return source::starts_with(m, pos - n + 1)
+        && (pos - n + 1 == 0 || isBrOrWsOrPunctuatorOrSpreadNotDot(pos - n));
+}
+// Detects whether the character sequence ending at `pos` (inclusive) ends a
+// for-of binding. In valid JS, the for-of `of` keyword always follows a
+// binding that ends with an identifier-tail char, ']', '}', or ')'.
+#[allow(non_snake_case)]
+pub fn isForOfBinding(pos: i32) -> bool {
+    // 'of' must be a complete token: the char before 'o' must be whitespace
+    // or a binding-terminator punctuator (excludes `proof / 2` etc.)
+    let c = source::charCodeAt(pos);
+    if !isBrOrWs(c) && c != 93/*]*/ && c != 125/*}*/ && c != 41/*)*/ {
+        return false;
+    }
+    // Skip whitespace back to the binding's last char.
+    let mut p = pos;
+    while p > 0 && isBrOrWs(source::charCodeAt(p)) {
+        p -= 1;
+    }
+    let c = source::charCodeAt(p);
+    return c == 93 || c == 125 || c == 41 || !isPunctuator(c);
+}
 // Detects one of case, debugger, delete, do, else, in, instanceof, new,
-//   return, throw, typeof, void, yield, await
+//   return, throw, typeof, void, yield, await, break, continue
 #[allow(non_snake_case)]
 pub fn isExpressionKeyword(pos: i32) -> bool {
     match source::charCodeAt(pos) {
         /*d*/
         100 => match source::charCodeAt(pos - 1) {
             /*i*/ // void
-            105 => readPrecedingKeyword(pos - 2, "vo"),
+            105 => readPrecedingKeywordn(pos - 2, "vo"),
             /*l*/ // yield
-            108 => readPrecedingKeyword(pos - 2, "yie"),
+            108 => readPrecedingKeywordn(pos - 2, "yie"),
             _ => false,
         },
         /*e*/
@@ -104,7 +177,9 @@ pub fn isExpressionKeyword(pos: i32) -> bool {
                 _ => false,
             },
             /*t*/ // delete
-            116 => readPrecedingKeyword(pos - 2, "dele"),
+            116 => readPrecedingKeywordn(pos - 2, "dele"),
+            /*u*/ // continue
+            117 => readPrecedingKeywordn(pos - 2, "contin"),
             _ => false,
         },
         /*f*/
@@ -116,26 +191,28 @@ pub fn isExpressionKeyword(pos: i32) -> bool {
             }
             match source::charCodeAt(pos - 3) {
                 /*c*/ // instanceof
-                99 => readPrecedingKeyword(pos - 4, "instan"),
+                99 => readPrecedingKeywordn(pos - 4, "instan"),
                 /*p*/ // typeof
-                112 => readPrecedingKeyword(pos - 4, "ty"),
+                112 => readPrecedingKeywordn(pos - 4, "ty"),
                 _ => false,
             }
         }
+        /*k*/ // break
+        107 => readPrecedingKeywordn(pos - 1, "brea"),
         /*n*/ // in, return
-        110 => readPrecedingKeyword1(pos - 1, 105 /*i*/) || readPrecedingKeyword(pos - 1, "retur"),
+        110 => readPrecedingKeyword1(pos - 1, 105 /*i*/) || readPrecedingKeywordn(pos - 1, "retur"),
         /*o*/ // do
         111 => readPrecedingKeyword1(pos - 1, 100 /*d*/),
         /*r*/ // debugger
-        114 => readPrecedingKeyword(pos - 1, "debugge"),
+        114 => readPrecedingKeywordn(pos - 1, "debugge"),
         /*t*/ // await
-        116 => readPrecedingKeyword(pos - 1, "awai"),
+        116 => readPrecedingKeywordn(pos - 1, "awai"),
         /*w*/
         119 => match source::charCodeAt(pos - 1) {
             /*e*/ // new
             101 => readPrecedingKeyword1(pos - 2, 110 /*n*/),
             /*o*/ // throw
-            111 => readPrecedingKeyword(pos - 2, "thr"),
+            111 => readPrecedingKeywordn(pos - 2, "thr"),
             _ => false,
         },
         _ => false,
@@ -143,9 +220,27 @@ pub fn isExpressionKeyword(pos: i32) -> bool {
 }
 #[allow(non_snake_case)]
 pub fn isParenKeyword(curPos: i32) -> bool {
-    return (source::charCodeAt(curPos) == 101 /*e*/ && source::starts_with("whil", curPos - 4))
-        || (source::charCodeAt(curPos) == 114 /*r*/ && source::starts_with("fo", curPos - 2))
-        || (source::charCodeAt(curPos - 1) == 105 /*i*/ && source::charCodeAt(curPos) == 102) /*f*/;
+    return readPrecedingKeywordn(curPos, "while")
+        || readPrecedingKeywordn(curPos, "for")
+        || readPrecedingKeywordn(curPos, "if");
+}
+#[allow(non_snake_case)]
+pub fn isBreakOrContinue(curPos: i32) -> bool {
+    match source::charCodeAt(curPos) {
+        /*k*/ // break
+        107 => readPrecedingKeywordn(curPos - 1, "brea"),
+        /*e*/
+        101 => {
+            if source::charCodeAt(curPos - 1) == 117
+            /*u*/
+            {
+                // continue
+                return readPrecedingKeywordn(curPos - 2, "contin");
+            }
+            false
+        }
+        _ => false,
+    }
 }
 #[allow(non_snake_case)]
 pub fn isExpressionTerminator(curPos: i32) -> bool {
@@ -157,12 +252,12 @@ pub fn isExpressionTerminator(curPos: i32) -> bool {
         62 => source::charCodeAt(curPos - 1) == 61 /*=*/,
         /*;*/ /*)*/
         59 | 41 => true,
-        /*h*/
-        104 => source::starts_with("catc", curPos - 4),
-        /*y*/
-        121 => source::starts_with("finall", curPos - 6),
-        /*e*/
-        101 => source::starts_with("els", curPos - 3),
+        /*h*/ // catch
+        104 => readPrecedingKeywordn(curPos - 1, "catc"),
+        /*y*/ // finally
+        121 => readPrecedingKeywordn(curPos - 1, "finall"),
+        /*e*/ // else
+        101 => readPrecedingKeywordn(curPos - 1, "els"),
         _ => false,
     }
 }

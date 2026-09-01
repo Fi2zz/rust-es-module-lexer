@@ -2,18 +2,28 @@ use crate::helper;
 use crate::position;
 use crate::source;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
+pub enum OpenTokenState {
+    AnyParen = 1,     // (
+    AnyBrace = 2,     // {
+    Template = 3,     // `
+    TemplateBrace = 4,// ${
+    ImportParen = 5,  // import()
+    ClassBrace = 6,
+    AsyncParen = 7,   // async()
+    AnyBracket = 8,   // [
+}
+#[derive(Debug, Clone, Copy)]
+pub struct OpenToken {
+    pub token: OpenTokenState,
+    pub pos: i32,
+}
+
 #[allow(non_upper_case_globals)]
 pub static mut openTokenDepth: i32 = 0;
 #[allow(non_upper_case_globals)]
-pub static mut templateDepth: i32 = -1;
-#[allow(non_upper_case_globals)]
-pub static mut templateStackDepth: i32 = 0;
-#[allow(non_upper_case_globals)]
-pub static mut templateStack: Vec<i32> = Vec::new();
-#[allow(non_upper_case_globals)]
-pub static mut openTokenPosStack: Vec<i32> = Vec::new();
-#[allow(non_upper_case_globals)]
-pub static mut openClassPosStack: Vec<bool> = Vec::new();
+pub static mut openTokenStack: Vec<OpenToken> = Vec::new();
 #[allow(non_upper_case_globals)]
 pub static mut nextBraceIsClass: bool = false;
 #[allow(non_upper_case_globals)]
@@ -25,20 +35,21 @@ pub static mut lastTokenPos: i32 = -1;
 #[allow(non_upper_case_globals)]
 static mut acornPos: i32 = 0;
 
-// mirrors the state initialization at the top of parse() in lexer.js
+// mirrors the state initialization at the top of parse() in lexer.c
 pub fn reset() {
     unsafe {
-        openTokenDepth = 0;
-        templateDepth = -1;
-        templateStackDepth = 0;
-        templateStack = vec![0; 1024];
-        openTokenPosStack = vec![0; 1024];
-        openClassPosStack = vec![false; 1024];
-        nextBraceIsClass = false;
-        lastSlashWasDivision = false;
         facade = true;
+        openTokenDepth = 0;
         lastTokenPos = -1;
+        lastSlashWasDivision = false;
+        nextBraceIsClass = false;
+        openTokenStack = vec![OpenToken { token: OpenTokenState::AnyParen, pos: 0 }; 1024];
     }
+}
+
+#[allow(non_snake_case)]
+pub fn getFacade() -> bool {
+    unsafe { facade }
 }
 
 #[allow(non_snake_case)]
@@ -71,15 +82,20 @@ pub fn templateString() {
         if ch == 36 && source::charCodeAt(position::position() + 1) == 123 {
             position::next();
             unsafe {
-                templateStack[templateStackDepth as usize] = templateDepth;
-                templateStackDepth += 1;
+                openTokenStack[openTokenDepth as usize] =
+                    OpenToken { token: OpenTokenState::TemplateBrace, pos: position::position() };
                 openTokenDepth += 1;
-                templateDepth = openTokenDepth;
             }
             return;
         }
         /*`*/
         if ch == 96 {
+            unsafe {
+                openTokenDepth -= 1;
+                if openTokenStack[openTokenDepth as usize].token != OpenTokenState::Template {
+                    helper::syntaxError();
+                }
+            }
             return;
         }
         /*\*/
@@ -88,6 +104,34 @@ pub fn templateString() {
         }
     }
     helper::syntaxError();
+}
+
+// pos AT the opening backtick. A no-substitution template literal (no ${...})
+// is a constant string, so a dynamic import can record it as a safe specifier.
+// On success consumes it, leaves pos AT the closing backtick and returns true.
+// On a substitution or EOF restores pos and returns false, leaving the literal
+// to the main loop's template handling.
+#[allow(non_snake_case)]
+pub fn noSubstitutionTemplate() -> bool {
+    let startPos = position::position();
+    while source::posIncLtEnd() {
+        let ch = source::charCodeAt(position::position());
+        /*`*/
+        if ch == 96 {
+            return true;
+        }
+        /*\*/
+        if ch == 92 {
+            position::next();
+            continue;
+        }
+        /*$*/ /*{*/
+        if ch == 36 && source::charCodeAt(position::position() + 1) == 123 {
+            break;
+        }
+    }
+    position::setPos(startPos);
+    return false;
 }
 
 #[allow(non_snake_case)]
@@ -137,7 +181,7 @@ pub fn readToWsOrPunctuator(ch: i32) -> i32 {
         }
         position::next();
         ch = source::charCodeAt(position::position());
-        // JS: while ((ch = source.charCodeAt(++pos))) stops on NaN / NUL
+        // C: while (ch = *(++pos)) stops on the null terminator
         if ch == 0 {
             return ch;
         }
@@ -146,8 +190,17 @@ pub fn readToWsOrPunctuator(ch: i32) -> i32 {
 
 /*
  * Ported from Acorn (MIT License, Copyright (C) 2012-2020 by various
- * contributors) — same as the reference lexer.js.
+ * contributors) — same as the reference lexer.js. Used to emulate the
+ * wrapper's eval() decoding of string / no-substitution template literals.
  */
+// start AT the opening quote ('"'), end one past the closing quote;
+// returns None where JS eval would throw
+#[allow(non_snake_case)]
+pub fn evalLiteral(start: i32, _end: i32) -> Option<String> {
+    let quote = source::charCodeAt(start);
+    std::panic::catch_unwind(|| readString(start + 1, quote)).ok()
+}
+
 #[allow(non_snake_case)]
 pub fn readString(start: i32, quote: i32) -> String {
     unsafe {
@@ -172,7 +225,8 @@ pub fn readString(start: i32, quote: i32) -> String {
         } else if ch == 0x2028 || ch == 0x2029 {
             unsafe { acornPos += 1 };
         } else {
-            if helper::isBr(ch) {
+            // raw line breaks are only permitted inside template literals
+            if helper::isBr(ch) && quote != 96 {
                 helper::syntaxError();
             }
             unsafe { acornPos += 1 };
@@ -186,11 +240,7 @@ pub fn readString(start: i32, quote: i32) -> String {
 
 #[allow(non_snake_case)]
 fn pushChunk(out: &mut Vec<u16>, start: i32, end: i32) {
-    let mut i = start;
-    while i < end {
-        out.push(source::charCodeAt(i) as u16);
-        i += 1;
-    }
+    out.extend(source::units(start, end));
 }
 
 // Used to read escaped characters

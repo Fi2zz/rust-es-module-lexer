@@ -9,12 +9,25 @@ struct Case {
 #[derive(Deserialize, Debug, PartialEq)]
 struct ExpectedImport {
     n: Option<String>,
+    t: Option<i32>,
     ss: i32,
     se: i32,
     s: i32,
     e: i32,
     a: i32,
     d: i32,
+    at: Option<Vec<(String, String)>>,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+struct ExpectedExport {
+    s: i32,
+    e: i32,
+    ls: i32,
+    le: i32,
+    ss: Option<i32>,
+    n: Option<String>,
+    ln: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -22,13 +35,25 @@ struct Expected {
     name: String,
     ok: bool,
     imports: Vec<ExpectedImport>,
-    exports: Vec<String>,
-    facade: bool,
+    exports: Vec<ExpectedExport>,
+    facade: Option<bool>,
 }
 
 // The lexer keeps global static state, so all cases run serially in one test.
 #[test]
 fn test_parse_matches_reference() {
+    // parse errors are delivered as panics; keep test output clean, but let
+    // assertion failures print as usual
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if let Some(msg) = info.payload().downcast_ref::<String>() {
+            if msg.starts_with("Parse error at") {
+                return;
+            }
+        }
+        default_hook(info);
+    }));
+
     let cases: Vec<Case> = serde_json::from_str(
         &std::fs::read_to_string("testdata/cases.json").expect("read cases.json"),
     )
@@ -41,32 +66,50 @@ fn test_parse_matches_reference() {
 
     for (case, exp) in cases.iter().zip(expected.iter()) {
         assert_eq!(case.name, exp.name, "case order mismatch");
-        assert!(exp.ok, "{}: reference itself failed", case.name);
 
-        crate::source::setSource(&case.source.as_bytes().to_vec());
-        let (imports, exports, facade) = crate::parse::parse();
+        let source = case.source.clone();
+        let result = std::panic::catch_unwind(move || {
+            crate::source::setSource(&source);
+            crate::parse::parse()
+        });
 
-        assert_eq!(facade, exp.facade, "{}: facade", case.name);
-        assert_eq!(exports, exp.exports, "{}: exports", case.name);
-        assert_eq!(
-            imports.len(),
-            exp.imports.len(),
-            "{}: imports length (got {:?})",
-            case.name,
-            imports
-        );
-        for (index, want) in exp.imports.iter().enumerate() {
-            let got = &imports[index];
-            let got = ExpectedImport {
-                n: got.n.clone(),
-                ss: got.ss,
-                se: got.se,
-                s: got.s,
-                e: got.e,
-                a: got.a,
-                d: got.d,
-            };
-            assert_eq!(&got, want, "{}: imports[{}]", case.name, index);
+        if !exp.ok {
+            assert!(result.is_err(), "{}: expected a parse error", case.name);
+            continue;
         }
+        let (imports, exports, facade) =
+            result.unwrap_or_else(|_| panic!("{}: unexpected parse error", case.name));
+
+        assert_eq!(Some(facade), exp.facade, "{}: facade", case.name);
+
+        let got_exports: Vec<ExpectedExport> = exports
+            .iter()
+            .map(|e| ExpectedExport {
+                s: e.s,
+                e: e.e,
+                ls: e.ls,
+                le: e.le,
+                ss: Some(e.ss),
+                n: e.n.clone(),
+                ln: e.ln.clone(),
+            })
+            .collect();
+        assert_eq!(got_exports, exp.exports, "{}: exports", case.name);
+
+        let got_imports: Vec<ExpectedImport> = imports
+            .iter()
+            .map(|i| ExpectedImport {
+                n: i.n.clone(),
+                t: Some(i.t),
+                ss: i.ss,
+                se: i.se,
+                s: i.s,
+                e: i.e,
+                a: i.a,
+                d: i.d,
+                at: i.at.clone(),
+            })
+            .collect();
+        assert_eq!(got_imports, exp.imports, "{}: imports", case.name);
     }
 }

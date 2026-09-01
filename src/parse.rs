@@ -4,7 +4,7 @@ use crate::helper;
 use crate::helper::ParseResult;
 use crate::helper::syntaxError;
 use crate::import::{self, tryParseImportStatement};
-use crate::lexer::{self, regularExpression, stringIteral, templateString};
+use crate::lexer::{self, regularExpression, stringIteral, templateString, OpenToken, OpenTokenState};
 use crate::position;
 use crate::source;
 
@@ -21,11 +21,11 @@ pub fn parse() -> ParseResult {
     mainParse();
 
     unsafe {
-        if lexer::templateDepth != -1 || lexer::openTokenDepth != 0 {
+        if lexer::openTokenDepth != 0 || import::dynamicImportStackLen() != 0 {
             syntaxError();
         }
-        return (import::getImports(), export::getExports(), lexer::facade);
     }
+    return (import::getImports(), export::getExports(), lexer::getFacade());
 }
 
 #[allow(non_snake_case)]
@@ -53,7 +53,9 @@ fn moduleOnlyParse() {
             }
             /*i*/
             105 => {
-                if helper::keywordStart() && source::starts_with("mport", position::position() + 1)
+                if source::charCodeAt(position::position() + 1) == 109 /*m*/
+                    && helper::keywordStart()
+                    && source::starts_with("port", position::position() + 2)
                 {
                     tryParseImportStatement();
                 }
@@ -94,63 +96,139 @@ fn mainParse() {
         if ch == 32 || (ch < 14 && ch > 8) {
             continue;
         }
-        match ch {
-            /*e*/
-            101 => {
-                if unsafe { lexer::openTokenDepth } == 0
-                    && helper::keywordStart()
-                    && source::starts_with("xport", position::position() + 1)
-                {
-                    tryParseExportStatement();
-                }
+        consumeToken(ch);
+    }
+}
+
+// Consume one token at the current ch/pos, updating the global tokenizer state.
+// The single source of tokenization: the main loop and skipExpression both call
+// it, so the regex/keyword/import rules never diverge. Comments do not advance
+// lastTokenPos. Syntax errors panic (C returns false up to parse()).
+#[allow(non_snake_case)]
+pub fn consumeToken(ch: i32) {
+    let mut isComment = false;
+    match ch {
+        /*e*/
+        101 => {
+            if unsafe { lexer::openTokenDepth } == 0
+                && helper::keywordStart()
+                && source::starts_with("xport", position::position() + 1)
+            {
+                tryParseExportStatement();
+            } else {
+                skipTokenRun();
             }
-            /*i*/
-            105 => {
-                if helper::keywordStart() && source::starts_with("mport", position::position() + 1)
-                {
-                    tryParseImportStatement();
-                }
-            }
-            /*c*/
-            99 => {
-                if helper::keywordStart()
-                    && source::starts_with("lass", position::position() + 1)
-                    && helper::isBrOrWs(source::charCodeAt(position::position() + 5))
-                {
-                    unsafe { lexer::nextBraceIsClass = true };
-                }
-            }
-            /*(*/
-            40 => unsafe {
-                lexer::openTokenPosStack[lexer::openTokenDepth as usize] = lexer::lastTokenPos;
-                lexer::openTokenDepth += 1;
-            },
-            /*)*/
-            41 => closeParen(),
-            /*{*/
-            123 => openBrace(),
-            /*}*/
-            125 => closeBrace(),
-            /*'*/ /*"*/
-            39 | 34 => stringIteral(ch),
-            // 47 is /
-            47 => {
-                if skipComment() {
-                    // dont update lastToken
-                    continue;
-                }
-                if slashStartsRegex() {
-                    regularExpression();
-                    unsafe { lexer::lastSlashWasDivision = false };
-                } else {
-                    unsafe { lexer::lastSlashWasDivision = true };
-                }
-            }
-            /*`*/
-            96 => templateString(),
-            _ => {}
         }
+        /*i*/
+        105 => {
+            if source::charCodeAt(position::position() + 1) == 109 /*m*/
+                && helper::keywordStart()
+                && source::starts_with("port", position::position() + 2)
+            {
+                tryParseImportStatement();
+            } else {
+                skipTokenRun();
+            }
+        }
+        /*c*/
+        99 => {
+            if source::charCodeAt(position::position() + 1) == 108 /*l*/
+                && helper::keywordStart()
+                && source::starts_with("ass", position::position() + 2)
+                && helper::isBrOrWs(source::charCodeAt(position::position() + 5))
+            {
+                unsafe { lexer::nextBraceIsClass = true };
+            }
+            skipTokenRun();
+        }
+        /*(*/
+        40 => unsafe {
+            lexer::openTokenStack[lexer::openTokenDepth as usize] =
+                OpenToken { token: OpenTokenState::AnyParen, pos: lexer::lastTokenPos };
+            lexer::openTokenDepth += 1;
+        },
+        /*[*/
+        91 => unsafe {
+            lexer::openTokenStack[lexer::openTokenDepth as usize] =
+                OpenToken { token: OpenTokenState::AnyBracket, pos: lexer::lastTokenPos };
+            lexer::openTokenDepth += 1;
+        },
+        /*]*/
+        93 => unsafe {
+            if lexer::openTokenDepth == 0 {
+                syntaxError();
+            }
+            lexer::openTokenDepth -= 1;
+        },
+        /*,*/
+        44 => commaToken(),
+        /*)*/
+        41 => closeParen(),
+        /*{*/
+        123 => openBrace(),
+        /*}*/
+        125 => unsafe {
+            if lexer::openTokenDepth == 0 {
+                syntaxError();
+            }
+            lexer::openTokenDepth -= 1;
+            if lexer::openTokenStack[lexer::openTokenDepth as usize].token
+                == OpenTokenState::TemplateBrace
+            {
+                templateString();
+            }
+        },
+        /*'*/ /*"*/
+        39 | 34 => stringIteral(ch),
+        // 47 is /
+        47 => {
+            isComment = handleSlash();
+        }
+        /*`*/
+        96 => {
+            unsafe {
+                lexer::openTokenStack[lexer::openTokenDepth as usize] =
+                    OpenToken { token: OpenTokenState::Template, pos: lexer::lastTokenPos };
+                lexer::openTokenDepth += 1;
+            }
+            templateString();
+        }
+        _ => {
+            if helper::isTokenRunChar(ch) {
+                skipTokenRun();
+            }
+        }
+    }
+    if !isComment {
         unsafe { lexer::lastTokenPos = position::position() };
+    }
+}
+
+#[allow(non_snake_case)]
+fn skipTokenRun() {
+    while helper::isTokenRunChar(source::charCodeAt(position::position() + 1)) {
+        position::next();
+    }
+}
+
+#[allow(non_snake_case)]
+fn commaToken() {
+    unsafe {
+        if import::dynamicImportStackLen() > 0
+            && lexer::openTokenDepth > 0
+            && lexer::openTokenStack[(lexer::openTokenDepth - 1) as usize].token
+                == OpenTokenState::ImportParen
+        {
+            let cur = import::topDynamicImport();
+            if import::getState(cur).end == 0 {
+                import::updateState(cur, |i| i.end = lexer::lastTokenPos + 1);
+                position::next();
+                crate::comment::commentWhitespace(true);
+                let attrPos = position::position();
+                import::updateState(cur, |i| i.attr_index = attrPos);
+                position::prev();
+            }
+        }
     }
 }
 
@@ -161,17 +239,17 @@ fn closeParen() {
             syntaxError();
         }
         lexer::openTokenDepth -= 1;
-        let cur = import::getCurDynamicImport();
-        if cur >= 0
-            && import::getImport(cur as usize).d
-                == lexer::openTokenPosStack[lexer::openTokenDepth as usize]
+        if import::dynamicImportStackLen() > 0
+            && lexer::openTokenStack[lexer::openTokenDepth as usize].token
+                == OpenTokenState::ImportParen
         {
-            let impt = cur as usize;
-            if import::getImport(impt).e == 0 {
-                import::updateImport(impt, |i| i.e = position::position());
+            let cur = import::topDynamicImport();
+            if import::getState(cur).end == 0 {
+                import::updateState(cur, |i| i.end = lexer::lastTokenPos + 1);
             }
-            import::updateImport(impt, |i| i.se = position::position());
-            import::setCurDynamicImport(-1);
+            let se = position::position() + 1;
+            import::updateState(cur, |i| i.statement_end = se);
+            import::popDynamicImport();
         }
     }
 }
@@ -182,41 +260,31 @@ fn openBrace() {
         // dynamic import followed by { is not a dynamic import (so remove)
         // this is a sneaky way to get around { import () {} } v { import () }
         // block / object ambiguity without a parser (assuming source is valid)
+        // statement_end (the char after the closing paren) identifies that paren;
+        // end is moved before the first comma for import(a, b), so it can't be used here
         if source::charCodeAt(lexer::lastTokenPos) == 41 /*)*/
             && import::importsLen() > 0
-            && import::getImport(import::importsLen() - 1).e == lexer::lastTokenPos
+            && import::getState(import::importsLen() - 1).statement_end == lexer::lastTokenPos + 1
         {
             import::popImport();
         }
-        lexer::openClassPosStack[lexer::openTokenDepth as usize] = lexer::nextBraceIsClass;
-        lexer::nextBraceIsClass = false;
-        lexer::openTokenPosStack[lexer::openTokenDepth as usize] = lexer::lastTokenPos;
+        let token = if lexer::nextBraceIsClass {
+            OpenTokenState::ClassBrace
+        } else {
+            OpenTokenState::AnyBrace
+        };
+        lexer::openTokenStack[lexer::openTokenDepth as usize] =
+            OpenToken { token, pos: lexer::lastTokenPos };
         lexer::openTokenDepth += 1;
+        lexer::nextBraceIsClass = false;
     }
 }
 
+// Division / regex ambiguity + comment dispatch, shared so skipExpression
+// resolves '/' with the exact main-loop logic. Returns true for a comment
+// (caller must not update lastTokenPos).
 #[allow(non_snake_case)]
-fn closeBrace() {
-    unsafe {
-        if lexer::openTokenDepth == 0 {
-            syntaxError();
-        }
-        // JS: if (openTokenDepth-- === templateDepth)
-        let closingDepth = lexer::openTokenDepth;
-        lexer::openTokenDepth -= 1;
-        if closingDepth == lexer::templateDepth {
-            lexer::templateStackDepth -= 1;
-            lexer::templateDepth = lexer::templateStack[lexer::templateStackDepth as usize];
-            templateString();
-        } else if lexer::templateDepth != -1 && lexer::openTokenDepth < lexer::templateDepth {
-            syntaxError();
-        }
-    }
-}
-
-// returns true when the slash turned out to be a comment (and was consumed)
-#[allow(non_snake_case)]
-fn skipComment() -> bool {
+fn handleSlash() -> bool {
     let next_ch = source::charCodeAt(position::position() + 1);
     if next_ch == 47 {
         lineComment();
@@ -225,6 +293,12 @@ fn skipComment() -> bool {
     if next_ch == 42 {
         blockComment(true);
         return true;
+    }
+    if slashStartsRegex() || export::lastExportCovers(unsafe { lexer::lastTokenPos }) {
+        regularExpression();
+        unsafe { lexer::lastSlashWasDivision = false };
+    } else {
+        divisionLookback();
     }
     return false;
 }
@@ -236,19 +310,116 @@ fn skipComment() -> bool {
 #[allow(non_snake_case)]
 fn slashStartsRegex() -> bool {
     unsafe {
-        let lastToken = source::charCodeAt(lexer::lastTokenPos);
-        let prevToken = source::charCodeAt(lexer::lastTokenPos - 1);
-        let openTokenPos = lexer::openTokenPosStack[lexer::openTokenDepth as usize];
+        let lastTokenPos = lexer::lastTokenPos;
+        let lastToken = source::charCodeAt(lastTokenPos);
+        let prevToken = source::charCodeAt(lastTokenPos - 1);
+        let openToken = lexer::openTokenStack[lexer::openTokenDepth as usize];
         return (helper::isExpressionPunctuator(lastToken)
             && !(lastToken == 46 /*.*/ && prevToken >= 48 /*0*/ && prevToken <= 57 /*9*/)
             && !(lastToken == 43 /*+*/ && prevToken == 43 /*+*/)
             && !(lastToken == 45 /*-*/ && prevToken == 45 /*-*/))
-            || (lastToken == 41 /*)*/ && helper::isParenKeyword(openTokenPos))
+            || (lastToken == 41 /*)*/ && helper::isParenKeyword(openToken.pos))
+            || (lexer::openTokenDepth > 0
+                && lexer::openTokenStack[(lexer::openTokenDepth - 1) as usize].token
+                    == OpenTokenState::AnyParen
+                && lastToken == 102 /*f*/
+                && prevToken == 111 /*o*/
+                && helper::isForOfBinding(lastTokenPos - 2)
+                && helper::readPrecedingKeywordn(
+                    lexer::openTokenStack[(lexer::openTokenDepth - 1) as usize].pos,
+                    "for",
+                ))
             || (lastToken == 125 /*}*/
-                && (helper::isExpressionTerminator(openTokenPos)
-                    || lexer::openClassPosStack[lexer::openTokenDepth as usize]))
+                && (helper::isExpressionTerminator(openToken.pos)
+                    || openToken.token == OpenTokenState::ClassBrace))
+            || helper::isExpressionKeyword(lastTokenPos)
             || (lastToken == 47 && lexer::lastSlashWasDivision) // 47 is /
-            || helper::isExpressionKeyword(lexer::lastTokenPos)
             || lastToken == 0;
     }
+}
+
+// Not a regex: walk lastTokenPos back over the current token run, and when that
+// run is whitespace-separated from a break/continue keyword, it was a regex
+// after all (ASI). Otherwise this was a division.
+#[allow(non_snake_case)]
+fn divisionLookback() {
+    unsafe {
+        // C: while (lastTokenPos > source && !isBrOrWsOrPunctuatorNotDot(*(--lastTokenPos)));
+        while lexer::lastTokenPos > 0 {
+            lexer::lastTokenPos -= 1;
+            if helper::isBrOrWsOrPunctuatorNotDot(source::charCodeAt(lexer::lastTokenPos)) {
+                break;
+            }
+        }
+        if helper::isWsNotBr(source::charCodeAt(lexer::lastTokenPos)) {
+            // C: while (lastTokenPos > source && isWsNotBr(*(--lastTokenPos)));
+            while lexer::lastTokenPos > 0 {
+                lexer::lastTokenPos -= 1;
+                if !helper::isWsNotBr(source::charCodeAt(lexer::lastTokenPos)) {
+                    break;
+                }
+            }
+            if helper::isBreakOrContinue(lexer::lastTokenPos) {
+                regularExpression();
+                lexer::lastSlashWasDivision = false;
+                return;
+            }
+        }
+        lexer::lastSlashWasDivision = true;
+    }
+}
+
+// Skips an initializer or default-value expression, returning the depth-0
+// terminator (',' or ';', or an enclosing ')'/']'/'}' that the expression did
+// not open) and leaving pos AT it. With `asi` set, a line break following a
+// value also terminates, so the statement after an automatic semicolon is never
+// read as another binding. Entry: pos AT the char before the expression (the
+// '=' of an initializer, or the '[' of a computed key).
+#[allow(non_snake_case)]
+pub fn skipExpression(asi: bool) -> i32 {
+    // Rides consumeToken (the single tokenizer) so the regex/keyword/import rules
+    // match the main loop exactly.
+    let baseDepth = unsafe { lexer::openTokenDepth };
+    let mut lastWasValue = false;
+    unsafe { lexer::lastTokenPos = position::position() };
+    while source::posIncLtEnd() {
+        let ch = source::charCodeAt(position::position());
+        if helper::isWsNotBr(ch) {
+            continue;
+        }
+        if unsafe { lexer::openTokenDepth } == baseDepth {
+            if ch == 44 /*,*/ || ch == 59 /*;*/ || ch == 41 /*)*/ || ch == 93 /*]*/ || ch == 125
+            /*}*/
+            {
+                return ch;
+            }
+            if asi && lastWasValue && helper::isBr(ch) {
+                return ch;
+            }
+        }
+        if helper::isBr(ch) {
+            continue;
+        }
+        let before = unsafe { lexer::lastTokenPos };
+        consumeToken(ch);
+        if unsafe { lexer::lastTokenPos } == before {
+            // a comment: a line comment can land on the ASI-terminating line break
+            if asi
+                && unsafe { lexer::openTokenDepth } == baseDepth
+                && lastWasValue
+                && helper::isBr(source::charCodeAt(position::position()))
+            {
+                return source::charCodeAt(position::position());
+            }
+        } else {
+            lastWasValue = if ch == 47 {
+                unsafe { !lexer::lastSlashWasDivision }
+            } else {
+                helper::isValueChar(ch)
+                    || ch == 41 || ch == 93 || ch == 125
+                    || ch == 39 || ch == 34 || ch == 96
+            };
+        }
+    }
+    return 0;
 }
