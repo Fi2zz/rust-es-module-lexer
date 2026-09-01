@@ -374,7 +374,7 @@ function tryParseExportStatement() {
 
 		// export var/let/const name = ...(, name = ...)+
 		case 118 /*v*/:
-		case 109 /*l*/:
+		case 108 /*l*/:
 			// destructured initializations not currently supported (skipped for { or [)
 			// also, lexing names after variable equals is skipped (export var p = function () { ... }, q = 5 skips "q")
 			pos += 2;
