@@ -156,8 +156,8 @@ pub fn isValueChar(c: i32) -> bool {
         || c == 95/*_*/ || c == 36/*$*/ || c >= 128;
 }
 #[allow(non_snake_case)]
-pub fn keywordStart() -> bool {
-    let pos = position::position();
+#[inline(always)]
+pub fn keywordStart(pos: i32) -> bool {
     return pos == 0 || isBrOrWsOrPunctuatorOrSpreadNotDot(pos - 1);
 }
 #[allow(non_snake_case)]

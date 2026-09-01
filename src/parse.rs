@@ -50,7 +50,7 @@ fn moduleOnlyParse() {
             /*e*/
             101 => {
                 if unsafe { lexer::openTokenDepth } == 0
-                    && helper::keywordStart()
+                    && helper::keywordStart(pos)
                     && source::starts_with("xport", pos + 1)
                 {
                     tryParseExportStatement();
@@ -64,7 +64,7 @@ fn moduleOnlyParse() {
             /*i*/
             105 => {
                 if source::charCodeAt(pos + 1) == 109 /*m*/
-                    && helper::keywordStart()
+                    && helper::keywordStart(pos)
                     && source::starts_with("port", pos + 2)
                 {
                     tryParseImportStatement();
@@ -132,53 +132,60 @@ fn mainParse() {
             unsafe { lexer::lastTokenPos = pos };
             continue;
         }
-        position::setPos(pos);
-        consumeToken(ch);
-        pos = position::position();
+        pos = consumeToken(pos, ch);
     }
     position::setPos(pos);
 }
 
-// Consume one token at the current ch/pos, updating the global tokenizer state.
+// Consume one token at the given ch/pos, updating the global tokenizer state.
 // The single source of tokenization: the main loop and skipExpression both call
 // it, so the regex/keyword/import rules never diverge. Comments do not advance
 // lastTokenPos. Syntax errors panic (C returns false up to parse()).
+//
+// pos 以寄存器方式进出（避免每 token 的全局 _pos 读写）；只有调用子扫描器
+// （tryParse*/stringIteral/templateString/handleSlash）的分支才临时同步全局
+// _pos，纯栈操作的分支（( ) [ ] { } ,）完全不碰 _pos。
 #[allow(non_snake_case)]
-pub fn consumeToken(ch: i32) {
+pub fn consumeToken(pos: i32, ch: i32) -> i32 {
+    let mut pos = pos;
     let mut isComment = false;
     match ch {
         /*e*/
         101 => {
             if unsafe { lexer::openTokenDepth } == 0
-                && helper::keywordStart()
-                && source::starts_with("xport", position::position() + 1)
+                && helper::keywordStart(pos)
+                && source::starts_with("xport", pos + 1)
             {
+                position::setPos(pos);
                 tryParseExportStatement();
+                pos = position::position();
             } else {
-                skipTokenRun();
+                pos = skipTokenRunFrom(pos);
             }
         }
         /*i*/
         105 => {
-            if source::charCodeAt(position::position() + 1) == 109 /*m*/
-                && helper::keywordStart()
-                && source::starts_with("port", position::position() + 2)
+            if source::charCodeAt(pos + 1) == 109 /*m*/
+                && helper::keywordStart(pos)
+                && source::starts_with("port", pos + 2)
             {
+                position::setPos(pos);
                 tryParseImportStatement();
+                pos = position::position();
             } else {
-                skipTokenRun();
+                pos = skipTokenRunFrom(pos);
             }
         }
         /*c*/
         99 => {
-            if source::charCodeAt(position::position() + 1) == 108 /*l*/
-                && helper::keywordStart()
-                && source::starts_with("ass", position::position() + 2)
-                && helper::isBrOrWs(source::charCodeAt(position::position() + 5))
+            if source::charCodeAt(pos + 1) == 108 /*l*/
+                && helper::keywordStart(pos)
+                && source::starts_with("ass", pos + 2)
+                && helper::isBrOrWs(source::charCodeAt(pos + 5))
             {
                 unsafe { lexer::nextBraceIsClass = true };
             }
-            skipTokenRun();
+            pos = skipTokenRunFrom(pos);
         }
         /*(*/
         40 => unsafe {
@@ -200,28 +207,38 @@ pub fn consumeToken(ch: i32) {
             lexer::openTokenDepth -= 1;
         },
         /*,*/
-        44 => commaToken(),
+        44 => pos = commaToken(pos),
         /*)*/
-        41 => closeParen(),
+        41 => closeParen(pos),
         /*{*/
         123 => openBrace(),
         /*}*/
-        125 => unsafe {
-            if lexer::openTokenDepth == 0 {
-                syntaxError();
-            }
-            lexer::openTokenDepth -= 1;
-            if lexer::openTokenStack[lexer::openTokenDepth as usize].token
-                == OpenTokenState::TemplateBrace
-            {
+        125 => {
+            let isTemplateBrace = unsafe {
+                if lexer::openTokenDepth == 0 {
+                    syntaxError();
+                }
+                lexer::openTokenDepth -= 1;
+                lexer::openTokenStack[lexer::openTokenDepth as usize].token
+                    == OpenTokenState::TemplateBrace
+            };
+            if isTemplateBrace {
+                position::setPos(pos);
                 templateString();
+                pos = position::position();
             }
-        },
+        }
         /*'*/ /*"*/
-        39 | 34 => stringIteral(ch),
+        39 | 34 => {
+            position::setPos(pos);
+            stringIteral(ch);
+            pos = position::position();
+        }
         // 47 is /
         47 => {
+            position::setPos(pos);
             isComment = handleSlash();
+            pos = position::position();
         }
         /*`*/
         96 => {
@@ -230,33 +247,36 @@ pub fn consumeToken(ch: i32) {
                     OpenToken { token: OpenTokenState::Template, pos: lexer::lastTokenPos };
                 lexer::openTokenDepth += 1;
             }
+            position::setPos(pos);
             templateString();
+            pos = position::position();
         }
         _ => {
             if helper::isTokenRunChar(ch) {
-                skipTokenRun();
+                pos = skipTokenRunFrom(pos);
             }
         }
     }
     if !isComment {
-        unsafe { lexer::lastTokenPos = position::position() };
+        unsafe { lexer::lastTokenPos = pos };
     }
+    return pos;
 }
 
+// C: while (isTokenRunChar(*(pos + 1))) pos++;
+// pos == end 时 C 读到 null 终止符（0），不是 token run char，同样停止
 #[allow(non_snake_case)]
-fn skipTokenRun() {
-    // C: while (isTokenRunChar(*(pos + 1))) pos++;
-    // pos == end 时 C 读到 null 终止符（0），不是 token run char，同样停止
+fn skipTokenRunFrom(pos: i32) -> i32 {
     let end = source::end();
-    let mut pos = position::position();
+    let mut pos = pos;
     while pos < end && helper::isTokenRunChar(source::charCodeAtUnchecked(pos + 1)) {
         pos += 1;
     }
-    position::setPos(pos);
+    return pos;
 }
 
 #[allow(non_snake_case)]
-fn commaToken() {
+fn commaToken(pos: i32) -> i32 {
     unsafe {
         if import::dynamicImportStackLen() > 0
             && lexer::openTokenDepth > 0
@@ -266,18 +286,20 @@ fn commaToken() {
             let cur = import::topDynamicImport();
             if import::importEnd(cur) == 0 {
                 import::updateState(cur, |i| i.end = lexer::lastTokenPos + 1);
-                position::next();
+                // C: pos++; ch = commentWhitespace(true); attr_index = pos; pos--;
+                position::setPos(pos + 1);
                 crate::comment::commentWhitespace(true);
                 let attrPos = position::position();
                 import::updateState(cur, |i| i.attr_index = attrPos);
-                position::prev();
+                return position::position() - 1;
             }
         }
     }
+    return pos;
 }
 
 #[allow(non_snake_case)]
-fn closeParen() {
+fn closeParen(pos: i32) {
     unsafe {
         if lexer::openTokenDepth == 0 {
             syntaxError();
@@ -291,8 +313,7 @@ fn closeParen() {
             if import::importEnd(cur) == 0 {
                 import::updateState(cur, |i| i.end = lexer::lastTokenPos + 1);
             }
-            let se = position::position() + 1;
-            import::updateState(cur, |i| i.statement_end = se);
+            import::updateState(cur, |i| i.statement_end = pos + 1);
             import::popDynamicImport();
         }
     }
@@ -454,9 +475,7 @@ pub fn skipExpression(asi: bool) -> i32 {
             continue;
         }
         let before = unsafe { lexer::lastTokenPos };
-        position::setPos(pos);
-        consumeToken(ch);
-        pos = position::position();
+        pos = consumeToken(pos, ch);
         if unsafe { lexer::lastTokenPos } == before {
             // a comment: a line comment can land on the ASI-terminating line break
             if asi

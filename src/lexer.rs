@@ -22,8 +22,11 @@ pub struct OpenToken {
 
 #[allow(non_upper_case_globals)]
 pub static mut openTokenDepth: i32 = 0;
+// 定长数组（对应 C 的栈上 OpenToken openTokenStack_[1024]）：槽位先写后读，
+// reset 时无需清栈
 #[allow(non_upper_case_globals)]
-pub static mut openTokenStack: Vec<OpenToken> = Vec::new();
+pub static mut openTokenStack: [OpenToken; 1024] =
+    [OpenToken { token: OpenTokenState::AnyParen, pos: 0 }; 1024];
 #[allow(non_upper_case_globals)]
 pub static mut nextBraceIsClass: bool = false;
 #[allow(non_upper_case_globals)]
@@ -43,7 +46,6 @@ pub fn reset() {
         lastTokenPos = -1;
         lastSlashWasDivision = false;
         nextBraceIsClass = false;
-        openTokenStack = vec![OpenToken { token: OpenTokenState::AnyParen, pos: 0 }; 1024];
     }
 }
 
