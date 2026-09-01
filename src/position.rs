@@ -13,8 +13,9 @@ pub fn prev() -> i32 {
 pub fn position() -> i32 {
     return unsafe { _pos };
 }
-pub fn cursor(steps: i32) -> i32 {
-    step(steps)
+#[allow(non_snake_case)]
+pub fn setPos(pos: i32) {
+    unsafe { _pos = pos };
 }
 pub fn dry(step: i32) -> i32 {
     return unsafe { _pos + step };

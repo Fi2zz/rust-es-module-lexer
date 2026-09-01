@@ -1,211 +1,254 @@
 use crate::comment::{blockComment, lineComment};
-use crate::export::tryParseExportStatement;
+use crate::export::{self, tryParseExportStatement};
 use crate::helper;
-use crate::helper::syntaxError;
 use crate::helper::ParseResult;
-use crate::import::{getImportByIndex, importsCount, popImport, tryParseImportStatement};
-use crate::lexer;
-use crate::lexer::getCurDynamicImport;
-use crate::lexer::setCurDynamicImport;
+use crate::helper::syntaxError;
+use crate::import::{self, tryParseImportStatement};
+use crate::lexer::{self, regularExpression, stringIteral, templateString};
 use crate::position;
 use crate::source;
-use std::i32::MIN;
 
-use crate::export;
-use crate::import;
-use crate::lexer::getFacade;
+// Note: parsing is based on the _assumption_ that the source is already valid
+pub fn parse() -> ParseResult {
+    position::setPos(-1);
+    lexer::reset();
+    import::reset();
+    export::reset();
+
+    // start with a pure "module-only" parser
+    moduleOnlyParse();
+    // then the main parser, continuing from the same position
+    mainParse();
+
+    unsafe {
+        if lexer::templateDepth != -1 || lexer::openTokenDepth != 0 {
+            syntaxError();
+        }
+        return (import::getImports(), export::getExports(), lexer::facade);
+    }
+}
+
 #[allow(non_snake_case)]
-fn getResult() -> ParseResult {
-    (import::getImports(), export::getExports(), getFacade())
-}
-pub fn parse() -> helper::ParseResult {
-    let ch: usize = pre_parse();
-    main_parse(ch);
-    getResult()
-}
-
-fn pre_parse() -> usize {
-    let mut pos = position::position();
-    let mut ch: usize = 0;
-    while source::ifNotEnd(pos) {
-        pos = position::next();
-        ch = source::charCodeAt(pos);
-        if lexer::skip(ch) {
+fn moduleOnlyParse() {
+    // as soon as we hit a non-module token, we go to main parser
+    while source::posIncLtEnd() {
+        let ch = source::charCodeAt(position::position());
+        if ch == 32 || (ch < 14 && ch > 8) {
             continue;
-        };
+        }
         match ch {
             /*e*/
             101 => {
-                //export
-                if lexer::openTokenDepthEqual(0)
-                    && helper::iskeyword_start(ch)
-                    && helper::is_export()
+                if unsafe { lexer::openTokenDepth } == 0
+                    && helper::keywordStart()
+                    && source::starts_with("xport", position::position() + 1)
                 {
                     tryParseExportStatement();
-                    if !lexer::getFacade() {
-                        lexer::setLastTokenPos(pos as i32);
+                    // export might have been a non-pure declaration
+                    if unsafe { !lexer::facade } {
+                        unsafe { lexer::lastTokenPos = position::position() };
+                        break;
                     }
                 }
             }
             /*i*/
             105 => {
-                if helper::iskeyword_start(ch) && helper::is_import() {
+                if helper::keywordStart() && source::starts_with("mport", position::position() + 1)
+                {
                     tryParseImportStatement();
                 }
             }
             /*;*/
             59 => {}
-            /* / */
+            // 47 is /
             47 => {
-                let next_ch = source::charCodeAt(position::position());
-                /* / */
+                let next_ch = source::charCodeAt(position::position() + 1);
                 if next_ch == 47 {
                     lineComment();
                     // dont update lastToken
                     continue;
-                } else
-                /***/
-                if next_ch == 42 {
+                } else if next_ch == 42 {
                     blockComment(true);
                     // dont update lastToken
                     continue;
                 }
+                // fallthrough
+                unsafe { lexer::facade = false };
+                position::prev();
+                break;
             }
-            _ => lexer::setFacade(false),
-        };
-        lexer::setLastTokenPos(pos as i32);
+            _ => {
+                unsafe { lexer::facade = false };
+                position::prev();
+                break;
+            }
+        }
+        unsafe { lexer::lastTokenPos = position::position() };
     }
-
-    ch
 }
 
-fn main_parse(ch: usize) {
-    let mut ch = ch;
-    let mut pos = position::position();
-    while source::ifNotEnd(pos) {
-        pos = position::next();
-        ch = source::charCodeAt(pos);
-        if lexer::skip(ch) {
+#[allow(non_snake_case)]
+fn mainParse() {
+    while source::posIncLtEnd() {
+        let ch = source::charCodeAt(position::position());
+        if ch == 32 || (ch < 14 && ch > 8) {
             continue;
-        };
+        }
         match ch {
             /*e*/
             101 => {
-                //export
-                if lexer::openTokenDepthEqual(0)
-                    && helper::iskeyword_start(ch)
-                    && helper::is_export()
+                if unsafe { lexer::openTokenDepth } == 0
+                    && helper::keywordStart()
+                    && source::starts_with("xport", position::position() + 1)
                 {
                     tryParseExportStatement();
                 }
             }
             /*i*/
             105 => {
-                if helper::iskeyword_start(ch) && helper::is_import() {
+                if helper::keywordStart() && source::starts_with("mport", position::position() + 1)
+                {
                     tryParseImportStatement();
                 }
             }
-            /*(*/
-            40 => {
-                lexer::setOpenTokenDepth(1);
-                let mut stack = lexer::getOpenClassPosStack();
-                for index in 0..stack.len() {
-                    if lexer::openTokenDepthEqual(index as i32) {
-                        stack[index] = lexer::getLastTokenPos()
-                    }
-                }
-                lexer::setOpenClassPosStack(stack)
-                //  break;
-            }
-            /*)*/
-            41 => {
-                if lexer::openTokenDepthEqual(1) {
-                    syntaxError();
-                }
-                let depth = lexer::setOpenTokenDepth(1);
-                let mut dynamic_import = getCurDynamicImport();
-                let mut found: i32 = MIN;
-                let stack = lexer::getOpenClassPosStack();
-                for index in 0..stack.len() {
-                    if index != depth as usize {
-                        continue;
-                    }
-                    found = stack[index];
-                }
-
-                // initial struct
-                if dynamic_import.d != -99 && found != MIN && dynamic_import.d == found {
-                    if dynamic_import.e == 1 {
-                        dynamic_import.e = pos;
-                    }
-                    dynamic_import.se = pos;
-                    setCurDynamicImport(dynamic_import)
-                }
-                break;
-            }
+            /*c*/
             99 => {
-                if helper::iskeyword_start(ch) && helper::iskeyword_class(pos, pos + 5) {
-                    let code = source::charCodeAt(pos + 5);
-                    if helper::is_br_or_whitespace(code) {
-                        lexer::setNextBraceIsClass(true);
-                    }
+                if helper::keywordStart()
+                    && source::starts_with("lass", position::position() + 1)
+                    && helper::isBrOrWs(source::charCodeAt(position::position() + 5))
+                {
+                    unsafe { lexer::nextBraceIsClass = true };
                 }
-                break;
             }
-
+            /*(*/
+            40 => unsafe {
+                lexer::openTokenPosStack[lexer::openTokenDepth as usize] = lexer::lastTokenPos;
+                lexer::openTokenDepth += 1;
+            },
+            /*)*/
+            41 => closeParen(),
             /*{*/
-            123 => {
-                let last_token_pos = lexer::getLastTokenPos();
-                // dynamic import followed by { is not a dynamic import (so remove)
-                // this is a sneaky way to get around { import () {} } v { import () }
-                // block / object ambiguity without a parser (assuming source is valid)
-                if source::charCodeAt(last_token_pos) == 41 && importsCount() > 0 {
-                    let last = getImportByIndex(-1);
-                    if last.e == last_token_pos {
-                        popImport()
-                    }
+            123 => openBrace(),
+            /*}*/
+            125 => closeBrace(),
+            /*'*/ /*"*/
+            39 | 34 => stringIteral(ch),
+            // 47 is /
+            47 => {
+                if skipComment() {
+                    // dont update lastToken
+                    continue;
                 }
-
-                let mut open_class_pos_stack = lexer::getOpenClassPosStack();
-                for index in 0..open_class_pos_stack.len() {
-                    if lexer::openTokenDepthEqual(index as i32) {
-                        open_class_pos_stack[index] = lexer::nextBraceIsClassToInt();
-                    }
-                }
-                lexer::setOpenClassPosStack(open_class_pos_stack);
-                lexer::setNextBraceIsClass(false);
-            }
-
-            125 => {
-                if lexer::openTokenDepthEqual(0) {
-                    syntaxError()
-                }
-                let depth = lexer::setOpenTokenDepth(-1);
-                let template_depth = lexer::getTemplateDepth();
-                if depth == template_depth {
-                    lexer::setOpenTokenDepth(-1);
-                    let depth: usize = lexer::getTemplateDepth() as usize;
-                    let mut template_stack = lexer::getTemplateStack();
-                    let value = template_stack.iter_mut().nth(depth);
-                    match value {
-                        Some(depth) => {
-                            lexer::setTemplateDepth(*depth);
-                            lexer::templateString();
-                        }
-                        _ => {}
-                    }
+                if slashStartsRegex() {
+                    regularExpression();
+                    unsafe { lexer::lastSlashWasDivision = false };
                 } else {
-                    if helper::compare(template_depth, -1, "!")
-                        && lexer::openTokenDepthCompare(template_depth, "<")
-                    {
-                        syntaxError();
-                    }
+                    unsafe { lexer::lastSlashWasDivision = true };
                 }
             }
-            39 | 34 => lexer::stringIteral(ch),
-            96 => lexer::templateString(),
+            /*`*/
+            96 => templateString(),
             _ => {}
         }
-        lexer::setLastTokenPos(pos);
+        unsafe { lexer::lastTokenPos = position::position() };
+    }
+}
+
+#[allow(non_snake_case)]
+fn closeParen() {
+    unsafe {
+        if lexer::openTokenDepth == 0 {
+            syntaxError();
+        }
+        lexer::openTokenDepth -= 1;
+        let cur = import::getCurDynamicImport();
+        if cur >= 0
+            && import::getImport(cur as usize).d
+                == lexer::openTokenPosStack[lexer::openTokenDepth as usize]
+        {
+            let impt = cur as usize;
+            if import::getImport(impt).e == 0 {
+                import::updateImport(impt, |i| i.e = position::position());
+            }
+            import::updateImport(impt, |i| i.se = position::position());
+            import::setCurDynamicImport(-1);
+        }
+    }
+}
+
+#[allow(non_snake_case)]
+fn openBrace() {
+    unsafe {
+        // dynamic import followed by { is not a dynamic import (so remove)
+        // this is a sneaky way to get around { import () {} } v { import () }
+        // block / object ambiguity without a parser (assuming source is valid)
+        if source::charCodeAt(lexer::lastTokenPos) == 41 /*)*/
+            && import::importsLen() > 0
+            && import::getImport(import::importsLen() - 1).e == lexer::lastTokenPos
+        {
+            import::popImport();
+        }
+        lexer::openClassPosStack[lexer::openTokenDepth as usize] = lexer::nextBraceIsClass;
+        lexer::nextBraceIsClass = false;
+        lexer::openTokenPosStack[lexer::openTokenDepth as usize] = lexer::lastTokenPos;
+        lexer::openTokenDepth += 1;
+    }
+}
+
+#[allow(non_snake_case)]
+fn closeBrace() {
+    unsafe {
+        if lexer::openTokenDepth == 0 {
+            syntaxError();
+        }
+        // JS: if (openTokenDepth-- === templateDepth)
+        let closingDepth = lexer::openTokenDepth;
+        lexer::openTokenDepth -= 1;
+        if closingDepth == lexer::templateDepth {
+            lexer::templateStackDepth -= 1;
+            lexer::templateDepth = lexer::templateStack[lexer::templateStackDepth as usize];
+            templateString();
+        } else if lexer::templateDepth != -1 && lexer::openTokenDepth < lexer::templateDepth {
+            syntaxError();
+        }
+    }
+}
+
+// returns true when the slash turned out to be a comment (and was consumed)
+#[allow(non_snake_case)]
+fn skipComment() -> bool {
+    let next_ch = source::charCodeAt(position::position() + 1);
+    if next_ch == 47 {
+        lineComment();
+        return true;
+    }
+    if next_ch == 42 {
+        blockComment(true);
+        return true;
+    }
+    return false;
+}
+
+// Division / regex ambiguity handling based on checking backtrack analysis of:
+// - what token came previously (lastToken)
+// - if a closing brace or paren, what token came before the corresponding
+//   opening brace or paren (lastOpenTokenIndex)
+#[allow(non_snake_case)]
+fn slashStartsRegex() -> bool {
+    unsafe {
+        let lastToken = source::charCodeAt(lexer::lastTokenPos);
+        let prevToken = source::charCodeAt(lexer::lastTokenPos - 1);
+        let openTokenPos = lexer::openTokenPosStack[lexer::openTokenDepth as usize];
+        return (helper::isExpressionPunctuator(lastToken)
+            && !(lastToken == 46 /*.*/ && prevToken >= 48 /*0*/ && prevToken <= 57 /*9*/)
+            && !(lastToken == 43 /*+*/ && prevToken == 43 /*+*/)
+            && !(lastToken == 45 /*-*/ && prevToken == 45 /*-*/))
+            || (lastToken == 41 /*)*/ && helper::isParenKeyword(openTokenPos))
+            || (lastToken == 125 /*}*/
+                && (helper::isExpressionTerminator(openTokenPos)
+                    || lexer::openClassPosStack[lexer::openTokenDepth as usize]))
+            || (lastToken == 47 && lexer::lastSlashWasDivision) // 47 is /
+            || helper::isExpressionKeyword(lexer::lastTokenPos)
+            || lastToken == 0;
     }
 }

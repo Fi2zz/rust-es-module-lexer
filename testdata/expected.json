@@ -1,0 +1,548 @@
+[
+  {
+    "name": "simple_default_import",
+    "ok": true,
+    "imports": [
+      {
+        "n": "module",
+        "ss": 0,
+        "se": 24,
+        "s": 17,
+        "e": 23,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "named_import_escape",
+    "ok": true,
+    "imports": [
+      {
+        "n": "modထ",
+        "ss": 0,
+        "se": 32,
+        "s": 22,
+        "e": 31,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "side_effect_import",
+    "ok": true,
+    "imports": [
+      {
+        "n": "side-effect",
+        "ss": 0,
+        "se": 20,
+        "s": 8,
+        "e": 19,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "namespace_import",
+    "ok": true,
+    "imports": [
+      {
+        "n": "mod",
+        "ss": 0,
+        "se": 25,
+        "s": 21,
+        "e": 24,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "import_with_comment",
+    "ok": true,
+    "imports": [
+      {
+        "n": "mod",
+        "ss": 0,
+        "se": 25,
+        "s": 21,
+        "e": 24,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "import_assert",
+    "ok": true,
+    "imports": [
+      {
+        "n": "./json.json",
+        "ss": 0,
+        "se": 54,
+        "s": 18,
+        "e": 29,
+        "a": 38,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "import_meta",
+    "ok": true,
+    "imports": [
+      {
+        "n": null,
+        "ss": 0,
+        "se": 11,
+        "s": 0,
+        "e": 11,
+        "a": -1,
+        "d": -2
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "import_meta_comment",
+    "ok": true,
+    "imports": [
+      {
+        "n": null,
+        "ss": 0,
+        "se": 24,
+        "s": 0,
+        "e": 24,
+        "a": -1,
+        "d": -2
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "not_import_keyword",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "import_in_function",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "dynamic_import_string",
+    "ok": true,
+    "imports": [
+      {
+        "n": "asdf",
+        "ss": 0,
+        "se": 13,
+        "s": 7,
+        "e": 13,
+        "a": -1,
+        "d": 0
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "dynamic_import_expr",
+    "ok": true,
+    "imports": [
+      {
+        "n": null,
+        "ss": 0,
+        "se": 10,
+        "s": 7,
+        "e": 10,
+        "a": -1,
+        "d": 0
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "dynamic_import_assert",
+    "ok": true,
+    "imports": [
+      {
+        "n": "mod",
+        "ss": 0,
+        "se": 42,
+        "s": 7,
+        "e": 12,
+        "a": 14,
+        "d": 0
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "dynamic_import_comment",
+    "ok": true,
+    "imports": [
+      {
+        "n": "",
+        "ss": 0,
+        "se": 59,
+        "s": 21,
+        "e": 29,
+        "a": 31,
+        "d": 0
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "dynamic_import_followed_by_brace",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "export_var",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "p"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_var_multiple",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "a"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_var_destructure",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "export_let_const",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "l",
+      "c"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_function",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "q"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_async_function",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "a1"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_generator",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "gen"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_class",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "SomeClass"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_default",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "default"
+    ],
+    "facade": false
+  },
+  {
+    "name": "export_named",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "a",
+      "c"
+    ],
+    "facade": true
+  },
+  {
+    "name": "export_star_from",
+    "ok": true,
+    "imports": [
+      {
+        "n": "external",
+        "ss": 0,
+        "se": 24,
+        "s": 15,
+        "e": 23,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "export_star_as_from",
+    "ok": true,
+    "imports": [
+      {
+        "n": "external2",
+        "ss": 0,
+        "se": 31,
+        "s": 21,
+        "e": 30,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [
+      "ns"
+    ],
+    "facade": true
+  },
+  {
+    "name": "export_named_from",
+    "ok": true,
+    "imports": [
+      {
+        "n": "external3",
+        "ss": 0,
+        "se": 34,
+        "s": 24,
+        "e": 33,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [
+      "b"
+    ],
+    "facade": true
+  },
+  {
+    "name": "facade_true",
+    "ok": true,
+    "imports": [
+      {
+        "n": "external",
+        "ss": 0,
+        "se": 24,
+        "s": 15,
+        "e": 23,
+        "a": -1,
+        "d": -1
+      },
+      {
+        "n": "external2",
+        "ss": 26,
+        "se": 57,
+        "s": 47,
+        "e": 56,
+        "a": -1,
+        "d": -1
+      },
+      {
+        "n": "external3",
+        "ss": 59,
+        "se": 93,
+        "s": 83,
+        "e": 92,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [
+      "b",
+      "ns"
+    ],
+    "facade": true
+  },
+  {
+    "name": "facade_false",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "p"
+    ],
+    "facade": false
+  },
+  {
+    "name": "regex_vs_division",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "r",
+      "d"
+    ],
+    "facade": false
+  },
+  {
+    "name": "regex_after_return",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "regex_character_class",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "division_after_paren_keyword",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "template_string",
+    "ok": true,
+    "imports": [
+      {
+        "n": "mod",
+        "ss": 33,
+        "se": 52,
+        "s": 48,
+        "e": 51,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "template_nested",
+    "ok": true,
+    "imports": [],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "string_with_escape",
+    "ok": true,
+    "imports": [
+      {
+        "n": "mod",
+        "ss": 0,
+        "se": 17,
+        "s": 8,
+        "e": 16,
+        "a": -1,
+        "d": -1
+      }
+    ],
+    "exports": [],
+    "facade": true
+  },
+  {
+    "name": "class_brace_tracking",
+    "ok": true,
+    "imports": [],
+    "exports": [
+      "A",
+      "B"
+    ],
+    "facade": false
+  },
+  {
+    "name": "mixed_readme_example",
+    "ok": true,
+    "imports": [
+      {
+        "n": "modထ",
+        "ss": 0,
+        "se": 32,
+        "s": 22,
+        "e": 31,
+        "a": -1,
+        "d": -1
+      },
+      {
+        "n": "./json.json",
+        "ss": 34,
+        "se": 88,
+        "s": 52,
+        "e": 63,
+        "a": 72,
+        "d": -1
+      },
+      {
+        "n": "",
+        "ss": 182,
+        "se": 240,
+        "s": 203,
+        "e": 211,
+        "a": 213,
+        "d": 182
+      },
+      {
+        "n": null,
+        "ss": 243,
+        "se": 267,
+        "s": 243,
+        "e": 267,
+        "a": -1,
+        "d": -2
+      }
+    ],
+    "exports": [
+      "p",
+      "q"
+    ],
+    "facade": false
+  }
+]

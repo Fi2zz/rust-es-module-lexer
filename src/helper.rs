@@ -1,25 +1,9 @@
 use crate::position;
 use crate::source;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Import {
-    /// name
-    pub n: String,
-    // statement start
-    pub ss: i32,
-    // statement end
-    pub se: i32,
-    // start
-    pub s: i32,
-    // end
-    pub e: i32,
-    // "a" = assert, -1 for no assertion
-    pub a: i32,
-    pub d: i32,
-}
-#[derive(Debug, Clone, Copy)]
-pub struct DynamicImport {
-    /// name
-    //  pub n: String,
+    /// name (None = undefined)
+    pub n: Option<String>,
     // statement start
     pub ss: i32,
     // statement end
@@ -37,176 +21,148 @@ pub type Imports = Vec<Import>;
 pub type Exports = Vec<String>;
 pub type Facade = bool;
 pub type ParseResult = (Imports, Exports, Facade);
-pub type VChars = Vec<char>;
 pub type Source = Vec<u8>;
-static SYNTAX_ERROR: &str = "Syntax Error";
-static KEYWORD_EXPORT: &str = "export";
-static KEYWORD_IMPORT: &str = "import";
-static KEYWORD_CLASSS: &str = "class";
-static KEYWORD_CONST: &str = "const";
-static KEYWORD_LET: &str = "let";
-static KEYWORD_VAR: &str = "var";
-static KEYWORD_FROM: &str = "from";
-static KEYWORD_DEFAULT: &str = "default";
-static KEYWORD_META: &str = "meta";
-pub fn create_import(ss: i32, s: i32, e: i32, d: i32) -> Import {
-    let se = if d == -2 {
-        e
-    } else if d == -1 {
-        e + 1
-    } else {
-        0
-    };
-    let import = Import {
-        ss,
-        s,
-        e,
-        d,
-        a: -1,
-        n: String::from(""),
-        se,
-    };
-    import
-}
 
-pub fn iskeyword_meta(str: &str) -> bool {
-    return str == KEYWORD_META;
-}
-pub fn iskeyword_export(str: &str) -> bool {
-    return str == KEYWORD_EXPORT;
-}
-
-pub fn iskeyword_import(str: &str) -> bool {
-    return str == KEYWORD_IMPORT;
-}
-
-pub fn iskeyword_from(str: &str) -> bool {
-    return str == KEYWORD_FROM;
-}
-
-pub fn iskeyword_default(str: &str) -> bool {
-    return str == KEYWORD_DEFAULT;
-}
-pub fn iskeyword_let(str: &str) -> bool {
-    return str == KEYWORD_LET;
-}
-
-pub fn iskeyword_var(str: &str) -> bool {
-    return str == KEYWORD_VAR;
-}
-
-pub fn create_imports() -> Vec<Import> {
-    return Vec::new();
-}
-
-pub fn create_exports() -> Vec<String> {
-    return Vec::new();
-}
-pub fn create_chars() -> Vec<char> {
-    return Vec::new();
-}
-
-pub fn create_vec_with_length(size: i32) -> Vec<i32> {
-    return vec![0, size];
-}
 #[allow(non_snake_case)]
-pub fn syntaxError() -> () {
-    panic!("{}", SYNTAX_ERROR);
-}
-
-pub fn print_cannot_empty_file() {
-    println!("Cannot parse empty file")
-}
-
-pub fn array_map(array: &mut Vec<i32>, callback: fn(v: i32, index: i32) -> i32) {
-    for index in 0..array.len() {
-        let result = callback(array[index], index as i32);
-        array[index] = result;
-    }
+pub fn syntaxError() -> ! {
+    panic!("Parse error at {}", position::position());
 }
 
 // Note: non-asii BR and whitespace checks omitted for perf / footprint
 // if there is a significant user need this can be reconsidered
-pub fn is_br(c: usize) -> bool {
+#[allow(non_snake_case)]
+pub fn isBr(c: i32) -> bool {
     return c == 13/*\r*/ || c == 10/*\n*/;
 }
-pub fn is_whitespace(c: usize) -> bool {
+#[allow(non_snake_case)]
+pub fn isWsNotBr(c: i32) -> bool {
     return c == 9 || c == 11 || c == 12 || c == 32 || c == 160;
 }
-pub fn is_br_or_whitespace(c: usize) -> bool {
+#[allow(non_snake_case)]
+pub fn isBrOrWs(c: i32) -> bool {
     return c > 8 && c < 14 || c == 32 || c == 160;
 }
-pub fn is_punctuator(ch: usize) -> bool {
+#[allow(non_snake_case)]
+pub fn isPunctuator(ch: i32) -> bool {
     // 23 possible punctuator endings: !%&()*+,-./:;<=>?[]^{}|~
-    return ch == 33/* *!*/ || ch == 37/*%*/ || ch == 38/*&*/ ||
+    return ch == 33/* !*/ || ch == 37/*%*/ || ch == 38/*&*/ ||
     ch > 39 && ch < 48 || ch > 57 && ch < 64 ||
     ch == 91/*[*/ || ch == 93/*]*/ || ch == 94/*^*/ ||
     ch > 122 && ch < 127;
 }
-
-pub fn is_br_or_ws_or_punctuator_not_dot(c: usize) -> bool {
-    return c > 8 && c < 14 || c == 32 || c == 160 || is_punctuator(c) && c != 46/*.*/;
+#[allow(non_snake_case)]
+pub fn isExpressionPunctuator(ch: i32) -> bool {
+    // 20 possible expression endings: !%&(*+,-.:;<=>?[^{|~
+    return ch == 33/* !*/ || ch == 37/*%*/ || ch == 38/*&*/ ||
+    ch > 39 && ch < 47 && ch != 41/*)*/ || ch > 57 && ch < 64 ||
+    ch == 91/*[*/ || ch == 94/*^*/ ||
+    ch > 122 && ch < 127 && ch != 125/*}*/;
 }
-pub fn at(str: &String) -> usize {
-    let bt = str.as_bytes();
-    return bt[0] as usize;
+#[allow(non_snake_case)]
+pub fn isBrOrWsOrPunctuatorNotDot(c: i32) -> bool {
+    return c > 8 && c < 14 || c == 32 || c == 160 || isPunctuator(c) && c != 46/*.*/;
 }
-pub fn is_whitespace_not_br(c: usize) -> bool {
-    return c == 9 || c == 11 || c == 12 || c == 32 || c == 160;
+#[allow(non_snake_case)]
+pub fn keywordStart() -> bool {
+    let pos = position::position();
+    return pos == 0 || isBrOrWsOrPunctuatorNotDot(source::charCodeAt(pos - 1));
 }
-
-pub fn is_export() -> bool {
-    let str = source::stringify(position::position(), position::dry(6));
-    iskeyword_export(&str)
-}
-pub fn is_import() -> bool {
-    let str = source::stringify(position::position(), position::dry(6));
-    println!("iskeyword_import {:?}", str);
-    iskeyword_import(&str)
-}
-pub fn iskeyword_start(ch: usize) -> bool {
-    if ch != 0 {
-        let start = position::dry(-1);
-        if start < 0 {
-            return false;
-        }
-        let code = source::charCodeAt(start);
-        return is_br_or_ws_or_punctuator_not_dot(code);
+#[allow(non_snake_case)]
+fn readPrecedingKeyword(pos: i32, m: &str) -> bool {
+    if pos < m.len() as i32 - 1 {
+        return false;
     }
-    return true;
+    return source::starts_with(m, pos - m.len() as i32 + 1)
+        && (pos == 0 || isBrOrWsOrPunctuatorNotDot(source::charCodeAt(pos - m.len() as i32)));
 }
-
-pub fn iskeyword_class(start: i32, end: i32) -> bool {
-    let str = source::stringify(start, end);
-    println!("class {:?}", str);
-    return str == KEYWORD_CLASSS;
+#[allow(non_snake_case)]
+fn readPrecedingKeyword1(pos: i32, ch: i32) -> bool {
+    return source::charCodeAt(pos) == ch
+        && (pos == 0 || isBrOrWsOrPunctuatorNotDot(source::charCodeAt(pos - 1)));
 }
-
-pub fn iskeyword_const(start: i32, end: i32) -> bool {
-    let str = source::stringify(start, end);
-    println!("class {:?}", str);
-    return str == KEYWORD_CONST;
+// Detects one of case, debugger, delete, do, else, in, instanceof, new,
+//   return, throw, typeof, void, yield, await
+#[allow(non_snake_case)]
+pub fn isExpressionKeyword(pos: i32) -> bool {
+    match source::charCodeAt(pos) {
+        /*d*/
+        100 => match source::charCodeAt(pos - 1) {
+            /*i*/ // void
+            105 => readPrecedingKeyword(pos - 2, "vo"),
+            /*l*/ // yield
+            108 => readPrecedingKeyword(pos - 2, "yie"),
+            _ => false,
+        },
+        /*e*/
+        101 => match source::charCodeAt(pos - 1) {
+            /*s*/
+            115 => match source::charCodeAt(pos - 2) {
+                /*l*/ // else
+                108 => readPrecedingKeyword1(pos - 3, 101 /*e*/),
+                /*a*/ // case
+                97 => readPrecedingKeyword1(pos - 3, 99 /*c*/),
+                _ => false,
+            },
+            /*t*/ // delete
+            116 => readPrecedingKeyword(pos - 2, "dele"),
+            _ => false,
+        },
+        /*f*/
+        102 => {
+            if source::charCodeAt(pos - 1) != 111 /*o*/ || source::charCodeAt(pos - 2) != 101
+            /*e*/
+            {
+                return false;
+            }
+            match source::charCodeAt(pos - 3) {
+                /*c*/ // instanceof
+                99 => readPrecedingKeyword(pos - 4, "instan"),
+                /*p*/ // typeof
+                112 => readPrecedingKeyword(pos - 4, "ty"),
+                _ => false,
+            }
+        }
+        /*n*/ // in, return
+        110 => readPrecedingKeyword1(pos - 1, 105 /*i*/) || readPrecedingKeyword(pos - 1, "retur"),
+        /*o*/ // do
+        111 => readPrecedingKeyword1(pos - 1, 100 /*d*/),
+        /*r*/ // debugger
+        114 => readPrecedingKeyword(pos - 1, "debugge"),
+        /*t*/ // await
+        116 => readPrecedingKeyword(pos - 1, "awai"),
+        /*w*/
+        119 => match source::charCodeAt(pos - 1) {
+            /*e*/ // new
+            101 => readPrecedingKeyword1(pos - 2, 110 /*n*/),
+            /*o*/ // throw
+            111 => readPrecedingKeyword(pos - 2, "thr"),
+            _ => false,
+        },
+        _ => false,
+    }
 }
-
-pub fn compare(target: i32, value: i32, ctype: &str) -> bool {
-    match ctype {
-        ">" => {
-            return target > value;
-        }
-        ">=" => {
-            return target >= value;
-        }
-        "<" => {
-            return target < value;
-        }
-        "<=" => {
-            return target <= value;
-        }
-        "!" => {
-            return target != value;
-        }
-        _ => {
-            return target == value;
-        }
+#[allow(non_snake_case)]
+pub fn isParenKeyword(curPos: i32) -> bool {
+    return (source::charCodeAt(curPos) == 101 /*e*/ && source::starts_with("whil", curPos - 4))
+        || (source::charCodeAt(curPos) == 114 /*r*/ && source::starts_with("fo", curPos - 2))
+        || (source::charCodeAt(curPos - 1) == 105 /*i*/ && source::charCodeAt(curPos) == 102) /*f*/;
+}
+#[allow(non_snake_case)]
+pub fn isExpressionTerminator(curPos: i32) -> bool {
+    // detects:
+    // => ; ) finally catch else
+    // as all of these followed by a { will indicate a statement brace
+    match source::charCodeAt(curPos) {
+        /*>*/
+        62 => source::charCodeAt(curPos - 1) == 61 /*=*/,
+        /*;*/ /*)*/
+        59 | 41 => true,
+        /*h*/
+        104 => source::starts_with("catc", curPos - 4),
+        /*y*/
+        121 => source::starts_with("finall", curPos - 6),
+        /*e*/
+        101 => source::starts_with("els", curPos - 3),
+        _ => false,
     }
 }

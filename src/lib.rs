@@ -1,9 +1,12 @@
+#![allow(static_mut_refs)]
+
 pub mod comment;
 pub mod export;
-pub mod parse;
 pub mod helper;
 pub mod import;
 pub mod lexer;
+pub mod parse;
 pub mod position;
 pub mod source;
-pub mod tests;
+#[cfg(test)]
+mod tests;
