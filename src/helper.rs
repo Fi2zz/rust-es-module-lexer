@@ -97,13 +97,56 @@ pub fn isQuote(ch: i32) -> bool {
     return ch == 39/*'*/ || ch == 34/*"*/;
 }
 // Fold ASCII case; NBSP is the only non-ASCII whitespace recognized here.
+// 256 项查找表（编译期常量）替代逐位算术，热循环里每字符一次查表
+#[allow(non_upper_case_globals)]
+static TOKEN_RUN_TABLE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut c = 0;
+    while c < 256 {
+        let folded = (c | 32) >= 97 && (c | 32) < 123; // a-z
+        let digit = c >= 48 && c < 58; // 0-9
+        table[c] = folded || digit
+            || c == 36 || c == 95 || c == 92 //$ _ \
+            || c > 127 && c != 160;
+        c += 1;
+    }
+    table
+};
 #[allow(non_snake_case)]
+#[inline(always)]
 pub fn isTokenRunChar(ch: i32) -> bool {
-    let folded = ((ch | 32) as u16).wrapping_sub(97) < 26;
-    let digit = (ch as u16).wrapping_sub(48) < 10;
-    return folded || digit
-        || ch == 36/*$*/ || ch == 95/*_*/ || ch == 92/*\*/
-        || ch > 127 && ch != 160;
+    if ch < 256 {
+        // ch 来自 u16 码元或 0，不会为负
+        unsafe { *TOKEN_RUN_TABLE.get_unchecked(ch as usize) }
+    } else {
+        true
+    }
+}
+// consumeToken 的 switch case 字符集（e i c ( [ ] , ) { } ' " / `），
+// 主循环快路径用它区分"无需分发"的普通字符
+#[allow(non_upper_case_globals)]
+static CONSUME_CASE_TABLE: [bool; 128] = {
+    let mut table = [false; 128];
+    table[101] = true; // e
+    table[105] = true; // i
+    table[99] = true; // c
+    table[40] = true; // (
+    table[91] = true; // [
+    table[93] = true; // ]
+    table[44] = true; // ,
+    table[41] = true; // )
+    table[123] = true; // {
+    table[125] = true; // }
+    table[39] = true; // '
+    table[34] = true; // "
+    table[47] = true; // /
+    table[96] = true; // `
+    table
+};
+#[allow(non_snake_case)]
+#[inline(always)]
+pub fn isConsumeCaseChar(ch: i32) -> bool {
+    ch < 128 && unsafe { *CONSUME_CASE_TABLE.get_unchecked(ch as usize) }
 }
 // True for a char that can end a value. skipExpression uses this to tell
 // division from a regex: a '/' right after a value is division.

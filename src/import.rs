@@ -73,6 +73,17 @@ pub fn addImport(ss: i32, s: i32, e: i32, d: i32) -> usize {
 pub fn getState(index: usize) -> ImportState {
     unsafe { imports[index].clone() }
 }
+// 热路径用的单字段读取（避免 getState 的整结构体克隆）
+#[allow(non_snake_case)]
+#[inline(always)]
+pub fn importEnd(index: usize) -> i32 {
+    unsafe { imports[index].end }
+}
+#[allow(non_snake_case)]
+#[inline(always)]
+pub fn importStatementEnd(index: usize) -> i32 {
+    unsafe { imports[index].statement_end }
+}
 #[allow(non_snake_case)]
 pub fn updateState<F: FnOnce(&mut ImportState)>(index: usize, update: F) {
     unsafe {

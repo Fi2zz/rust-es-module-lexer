@@ -54,42 +54,61 @@ pub fn getFacade() -> bool {
 
 #[allow(non_snake_case)]
 pub fn stringIteral(quote: i32) {
-    while source::posIncLtEnd() {
-        let mut ch = source::charCodeAt(position::position());
+    // 局部游标扫描；pos 循环内最多走到 end + 1，预读 pos + 1 最多 end + 2，
+    // 都在哨兵范围内（charCodeAtUnchecked 安全）
+    let end = source::end();
+    let mut pos = position::position();
+    loop {
+        pos += 1;
+        if pos > end {
+            position::setPos(pos);
+            helper::syntaxError();
+        }
+        let mut ch = source::charCodeAtUnchecked(pos);
         if ch == quote {
-            return;
+            break;
         }
         /*\*/
         if ch == 92 {
-            position::next();
-            ch = source::charCodeAt(position::position());
+            pos += 1;
+            ch = source::charCodeAtUnchecked(pos);
             /*\r*/ /*\n*/
-            if ch == 13 && source::charCodeAt(position::position() + 1) == 10 {
-                position::next();
+            if ch == 13 && source::charCodeAtUnchecked(pos + 1) == 10 {
+                pos += 1;
             }
         } else if helper::isBr(ch) {
-            break;
+            position::setPos(pos);
+            helper::syntaxError();
         }
     }
-    helper::syntaxError();
+    position::setPos(pos);
 }
 
 #[allow(non_snake_case)]
 pub fn templateString() {
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    let end = source::end();
+    let mut pos = position::position();
+    loop {
+        pos += 1;
+        if pos > end {
+            position::setPos(pos);
+            helper::syntaxError();
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         /*$*/ /*{*/
-        if ch == 36 && source::charCodeAt(position::position() + 1) == 123 {
-            position::next();
+        if ch == 36 && source::charCodeAtUnchecked(pos + 1) == 123 {
+            pos += 1;
+            position::setPos(pos);
             unsafe {
                 openTokenStack[openTokenDepth as usize] =
-                    OpenToken { token: OpenTokenState::TemplateBrace, pos: position::position() };
+                    OpenToken { token: OpenTokenState::TemplateBrace, pos };
                 openTokenDepth += 1;
             }
             return;
         }
         /*`*/
         if ch == 96 {
+            position::setPos(pos);
             unsafe {
                 openTokenDepth -= 1;
                 if openTokenStack[openTokenDepth as usize].token != OpenTokenState::Template {
@@ -100,10 +119,9 @@ pub fn templateString() {
         }
         /*\*/
         if ch == 92 {
-            position::next();
+            pos += 1;
         }
     }
-    helper::syntaxError();
 }
 
 // pos AT the opening backtick. A no-substitution template literal (no ${...})
@@ -114,19 +132,26 @@ pub fn templateString() {
 #[allow(non_snake_case)]
 pub fn noSubstitutionTemplate() -> bool {
     let startPos = position::position();
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    let end = source::end();
+    let mut pos = startPos;
+    loop {
+        pos += 1;
+        if pos > end {
+            break;
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         /*`*/
         if ch == 96 {
+            position::setPos(pos);
             return true;
         }
         /*\*/
         if ch == 92 {
-            position::next();
+            pos += 1;
             continue;
         }
         /*$*/ /*{*/
-        if ch == 36 && source::charCodeAt(position::position() + 1) == 123 {
+        if ch == 36 && source::charCodeAtUnchecked(pos + 1) == 123 {
             break;
         }
     }
@@ -136,53 +161,74 @@ pub fn noSubstitutionTemplate() -> bool {
 
 #[allow(non_snake_case)]
 pub fn regexCharacterClass() {
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    let end = source::end();
+    let mut pos = position::position();
+    loop {
+        pos += 1;
+        if pos > end {
+            position::setPos(pos);
+            helper::syntaxError();
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         /*]*/
         if ch == 93 {
-            return;
+            break;
         }
         /*\*/
         if ch == 92 {
-            position::next();
+            pos += 1;
         } else if ch == 10 || ch == 13 {
-            break;
+            position::setPos(pos);
+            helper::syntaxError();
         }
     }
-    helper::syntaxError();
+    position::setPos(pos);
 }
 
 #[allow(non_snake_case)]
 pub fn regularExpression() {
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    let end = source::end();
+    let mut pos = position::position();
+    loop {
+        pos += 1;
+        if pos > end {
+            position::setPos(pos);
+            helper::syntaxError();
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         // 47 is /
         if ch == 47 {
-            return;
+            break;
         }
         /*[*/
         if ch == 91 {
+            position::setPos(pos);
             regexCharacterClass();
+            pos = position::position();
         } else if ch == 92 {
-            position::next();
+            pos += 1;
         } else if ch == 10 || ch == 13 {
-            break;
+            position::setPos(pos);
+            helper::syntaxError();
         }
     }
-    helper::syntaxError();
+    position::setPos(pos);
 }
 
 #[allow(non_snake_case)]
 pub fn readToWsOrPunctuator(ch: i32) -> i32 {
+    // C: do { ... } while (ch = *(++pos)) —— 读到 null 终止符（哨兵 0）停止
     let mut ch = ch;
+    let mut pos = position::position();
     loop {
         if helper::isBrOrWs(ch) || helper::isPunctuator(ch) {
+            position::setPos(pos);
             return ch;
         }
-        position::next();
-        ch = source::charCodeAt(position::position());
-        // C: while (ch = *(++pos)) stops on the null terminator
+        pos += 1;
+        ch = source::charCodeAtUnchecked(pos);
         if ch == 0 {
+            position::setPos(pos);
             return ch;
         }
     }

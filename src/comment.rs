@@ -35,26 +35,39 @@ pub fn commentWhitespace(br: bool) -> i32 {
 }
 #[allow(non_snake_case)]
 pub fn lineComment() {
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    let end = source::end();
+    let mut pos = position::position();
+    loop {
+        pos += 1;
+        if pos > end {
+            break;
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         //10 /*\n*/ //13 /*\r*/
         if ch == 10 || ch == 13 {
-            return;
+            break;
         }
     }
+    position::setPos(pos);
 }
 #[allow(non_snake_case)]
 pub fn blockComment(br: bool) {
-    position::next();
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    let end = source::end();
+    let mut pos = position::position() + 1;
+    loop {
+        pos += 1;
+        if pos > end {
+            break;
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         if !br && helper::isBr(ch) {
-            return;
+            break;
         }
         /*  42 is * & 47 is / */
-        if ch == 42 && source::charCodeAt(position::position() + 1) == 47 {
-            position::next();
-            return;
+        if ch == 42 && source::charCodeAtUnchecked(pos + 1) == 47 {
+            pos += 1;
+            break;
         }
     }
+    position::setPos(pos);
 }

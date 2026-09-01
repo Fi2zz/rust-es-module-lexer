@@ -31,31 +31,41 @@ pub fn parse() -> ParseResult {
 #[allow(non_snake_case)]
 fn moduleOnlyParse() {
     // as soon as we hit a non-module token, we go to main parser
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    // 热循环内用局部 pos 游标，只在调用子解析器前后同步全局 _pos；
+    // pos 在 [0, end] 内，charCodeAtUnchecked 安全
+    let end = source::end();
+    let mut pos = position::position();
+    let mut brk = false;
+    loop {
+        pos += 1;
+        if pos > end {
+            break;
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         if ch == 32 || (ch < 14 && ch > 8) {
             continue;
         }
+        position::setPos(pos);
         match ch {
             /*e*/
             101 => {
                 if unsafe { lexer::openTokenDepth } == 0
                     && helper::keywordStart()
-                    && source::starts_with("xport", position::position() + 1)
+                    && source::starts_with("xport", pos + 1)
                 {
                     tryParseExportStatement();
                     // export might have been a non-pure declaration
                     if unsafe { !lexer::facade } {
                         unsafe { lexer::lastTokenPos = position::position() };
-                        break;
+                        brk = true;
                     }
                 }
             }
             /*i*/
             105 => {
-                if source::charCodeAt(position::position() + 1) == 109 /*m*/
+                if source::charCodeAt(pos + 1) == 109 /*m*/
                     && helper::keywordStart()
-                    && source::starts_with("port", position::position() + 2)
+                    && source::starts_with("port", pos + 2)
                 {
                     tryParseImportStatement();
                 }
@@ -64,40 +74,69 @@ fn moduleOnlyParse() {
             59 => {}
             // 47 is /
             47 => {
-                let next_ch = source::charCodeAt(position::position() + 1);
+                let next_ch = source::charCodeAt(pos + 1);
                 if next_ch == 47 {
                     lineComment();
                     // dont update lastToken
+                    pos = position::position();
                     continue;
                 } else if next_ch == 42 {
                     blockComment(true);
                     // dont update lastToken
+                    pos = position::position();
                     continue;
                 }
                 // fallthrough
                 unsafe { lexer::facade = false };
                 position::prev();
-                break;
+                brk = true;
             }
             _ => {
                 unsafe { lexer::facade = false };
                 position::prev();
-                break;
+                brk = true;
             }
         }
+        if brk {
+            pos = position::position();
+            break;
+        }
         unsafe { lexer::lastTokenPos = position::position() };
+        pos = position::position();
     }
+    position::setPos(pos);
 }
 
 #[allow(non_snake_case)]
 fn mainParse() {
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    // 热循环内用局部 pos 游标，只在 consumeToken 前后同步全局 _pos
+    let end = source::end();
+    let mut pos = position::position();
+    loop {
+        pos += 1;
+        if pos > end {
+            break;
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         if ch == 32 || (ch < 14 && ch > 8) {
             continue;
         }
+        // 快路径（查表）：consumeToken 的 default 分支内联，token run 整段
+        // 本地跳过，省掉每 token 的全局 _pos 同步与函数调用
+        if !helper::isConsumeCaseChar(ch) {
+            if helper::isTokenRunChar(ch) {
+                while pos < end && helper::isTokenRunChar(source::charCodeAtUnchecked(pos + 1)) {
+                    pos += 1;
+                }
+            }
+            unsafe { lexer::lastTokenPos = pos };
+            continue;
+        }
+        position::setPos(pos);
         consumeToken(ch);
+        pos = position::position();
     }
+    position::setPos(pos);
 }
 
 // Consume one token at the current ch/pos, updating the global tokenizer state.
@@ -206,9 +245,14 @@ pub fn consumeToken(ch: i32) {
 
 #[allow(non_snake_case)]
 fn skipTokenRun() {
-    while helper::isTokenRunChar(source::charCodeAt(position::position() + 1)) {
-        position::next();
+    // C: while (isTokenRunChar(*(pos + 1))) pos++;
+    // pos == end 时 C 读到 null 终止符（0），不是 token run char，同样停止
+    let end = source::end();
+    let mut pos = position::position();
+    while pos < end && helper::isTokenRunChar(source::charCodeAtUnchecked(pos + 1)) {
+        pos += 1;
     }
+    position::setPos(pos);
 }
 
 #[allow(non_snake_case)]
@@ -220,7 +264,7 @@ fn commaToken() {
                 == OpenTokenState::ImportParen
         {
             let cur = import::topDynamicImport();
-            if import::getState(cur).end == 0 {
+            if import::importEnd(cur) == 0 {
                 import::updateState(cur, |i| i.end = lexer::lastTokenPos + 1);
                 position::next();
                 crate::comment::commentWhitespace(true);
@@ -244,7 +288,7 @@ fn closeParen() {
                 == OpenTokenState::ImportParen
         {
             let cur = import::topDynamicImport();
-            if import::getState(cur).end == 0 {
+            if import::importEnd(cur) == 0 {
                 import::updateState(cur, |i| i.end = lexer::lastTokenPos + 1);
             }
             let se = position::position() + 1;
@@ -264,7 +308,7 @@ fn openBrace() {
         // end is moved before the first comma for import(a, b), so it can't be used here
         if source::charCodeAt(lexer::lastTokenPos) == 41 /*)*/
             && import::importsLen() > 0
-            && import::getState(import::importsLen() - 1).statement_end == lexer::lastTokenPos + 1
+            && import::importStatementEnd(import::importsLen() - 1) == lexer::lastTokenPos + 1
         {
             import::popImport();
         }
@@ -378,12 +422,19 @@ fn divisionLookback() {
 #[allow(non_snake_case)]
 pub fn skipExpression(asi: bool) -> i32 {
     // Rides consumeToken (the single tokenizer) so the regex/keyword/import rules
-    // match the main loop exactly.
+    // match the main loop exactly. 局部游标扫描，consumeToken 前后同步全局 _pos
     let baseDepth = unsafe { lexer::openTokenDepth };
     let mut lastWasValue = false;
-    unsafe { lexer::lastTokenPos = position::position() };
-    while source::posIncLtEnd() {
-        let ch = source::charCodeAt(position::position());
+    let end = source::end();
+    let mut pos = position::position();
+    unsafe { lexer::lastTokenPos = pos };
+    loop {
+        pos += 1;
+        if pos > end {
+            position::setPos(pos);
+            return 0;
+        }
+        let ch = source::charCodeAtUnchecked(pos);
         if helper::isWsNotBr(ch) {
             continue;
         }
@@ -391,9 +442,11 @@ pub fn skipExpression(asi: bool) -> i32 {
             if ch == 44 /*,*/ || ch == 59 /*;*/ || ch == 41 /*)*/ || ch == 93 /*]*/ || ch == 125
             /*}*/
             {
+                position::setPos(pos);
                 return ch;
             }
             if asi && lastWasValue && helper::isBr(ch) {
+                position::setPos(pos);
                 return ch;
             }
         }
@@ -401,15 +454,17 @@ pub fn skipExpression(asi: bool) -> i32 {
             continue;
         }
         let before = unsafe { lexer::lastTokenPos };
+        position::setPos(pos);
         consumeToken(ch);
+        pos = position::position();
         if unsafe { lexer::lastTokenPos } == before {
             // a comment: a line comment can land on the ASI-terminating line break
             if asi
                 && unsafe { lexer::openTokenDepth } == baseDepth
                 && lastWasValue
-                && helper::isBr(source::charCodeAt(position::position()))
+                && helper::isBr(source::charCodeAt(pos))
             {
-                return source::charCodeAt(position::position());
+                return source::charCodeAt(pos);
             }
         } else {
             lastWasValue = if ch == 47 {
@@ -421,5 +476,4 @@ pub fn skipExpression(asi: bool) -> i32 {
             };
         }
     }
-    return 0;
 }
