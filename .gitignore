@@ -1,3 +1,4 @@
 /target
 node_modules/
 .upstream-ref/
+pkg/

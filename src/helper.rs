@@ -1,6 +1,7 @@
 use crate::position;
 use crate::source;
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize))]
 pub struct Import {
     /// name (None = undefined / not a safe specifier)
     pub n: Option<String>,
@@ -24,6 +25,7 @@ pub struct Import {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize))]
 pub struct Export {
     // exported name start/end
     pub s: i32,
@@ -44,6 +46,11 @@ pub type ParseResult = (Imports, Exports, Facade);
 
 #[allow(non_snake_case)]
 pub fn syntaxError() -> ! {
+    // wasm32 默认 panic=abort（catch_unwind 不住），直接抛 JS 异常；
+    // Rust 栈不做展开，全局状态遗留无碍——parse 入口会全部重置
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen::throw_str(&format!("Parse error at {}", position::position()));
+    #[cfg(not(target_arch = "wasm32"))]
     panic!("Parse error at {}", position::position());
 }
 

@@ -4,8 +4,18 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
 lazy_static = "1.4.0"
+
+# WASM 绑定只在 wasm32 目标上启用，原生构建与测试不受影响
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
+serde = { version = "1", features = ["derive"] }
+js-sys = "0.3"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

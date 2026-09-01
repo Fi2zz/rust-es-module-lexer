@@ -9,5 +9,7 @@ pub mod lexer;
 pub mod parse;
 pub mod position;
 pub mod source;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
 #[cfg(test)]
 mod tests;

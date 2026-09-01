@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/Fi2zz/rust-es-module-lexer#readme",
   "devDependencies": {
-    "es-module-lexer": "^2.3.2"
+    "es-module-lexer": "^2.3.2",
+    "wasm-pack": "^0.15.0"
   }
 }

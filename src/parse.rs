@@ -204,6 +204,7 @@ pub fn consumeToken(pos: i32, ch: i32) -> i32 {
         /*]*/
         93 => unsafe {
             if lexer::openTokenDepth == 0 {
+                position::setPos(pos);
                 syntaxError();
             }
             lexer::openTokenDepth -= 1;
@@ -226,6 +227,7 @@ pub fn consumeToken(pos: i32, ch: i32) -> i32 {
         125 => {
             let isTemplateBrace = unsafe {
                 if lexer::openTokenDepth == 0 {
+                    position::setPos(pos);
                     syntaxError();
                 }
                 lexer::openTokenDepth -= 1;

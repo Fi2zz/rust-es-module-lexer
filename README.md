@@ -102,6 +102,45 @@ behavior, captured from its WASM build:
 The benchmark and sample diffs need the upstream repo checked out locally:
 `git clone --depth 1 https://github.com/guybedford/es-module-lexer .upstream-ref`
 
+### JavaScript / WASM
+
+The lexer is exposed to JS via wasm-bindgen (Node + browsers). Build both
+targets (requires the `wasm32-unknown-unknown` Rust target and wasm-pack,
+e.g. `npm install --save-dev wasm-pack`):
+
+```sh
+npx wasm-pack build --release --target nodejs --out-dir pkg/nodejs
+npx wasm-pack build --release --target bundler --out-dir pkg/bundler
+```
+
+Node (CommonJS), synchronously — no async `init` like upstream:
+
+```js
+const { parse } = require("./pkg/nodejs");
+const [imports, exports, facade] = parse("export const p = 5");
+// imports: { n, t, ss, se, s, e, a, d, at }, exports: { s, e, ls, le, ss, n, ln }
+```
+
+Browser / bundler (ESM):
+
+```js
+import { parse } from "./pkg/bundler";
+const [imports, exports, facade] = parse(source);
+```
+
+API correspondence with upstream es-module-lexer 2.x: same `[imports, exports,
+facade]` triple and field names; import phases (`t`), import attributes (`at`,
+`with { ... }` only) and the `ls/le/ln/ss` export fields follow upstream 2.3.2.
+Differences: JSX is supported (always on); parse errors throw a plain JS
+`Error("Parse error at <offset>")` instead of the upstream `Parse error
+name:line:col` + `idx` shape; no `hasModuleSyntax` fourth return value.
+
+Run the end-to-end corpus against the Node build:
+
+```sh
+node scripts/test_wasm.cjs   # 278 cases, compared field-by-field with testdata expectations
+```
+
 ### Limitations
 
 - **TS/TSX is explicitly out of scope.** Plain `.tsx` type syntax is not

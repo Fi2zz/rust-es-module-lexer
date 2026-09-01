@@ -251,11 +251,12 @@ pub fn readToWsOrPunctuator(ch: i32) -> i32 {
 #[allow(non_snake_case)]
 pub fn evalLiteral(start: i32, _end: i32) -> Option<String> {
     let quote = source::charCodeAt(start);
-    std::panic::catch_unwind(|| readString(start + 1, quote)).ok()
+    // Result 而非 panic/catch_unwind：wasm32 默认 panic=abort，catch 不住
+    readString(start + 1, quote).ok()
 }
 
 #[allow(non_snake_case)]
-pub fn readString(start: i32, quote: i32) -> String {
+pub fn readString(start: i32, quote: i32) -> Result<String, ()> {
     // quote == 96: template literal; the escape/line-break rules then follow
     // eval() semantics for templates (no octal, line endings normalized)
     let template = quote == 96;
@@ -267,7 +268,7 @@ pub fn readString(start: i32, quote: i32) -> String {
     loop {
         let acorn_pos = unsafe { acornPos };
         if acorn_pos >= source::len() {
-            helper::syntaxError();
+            return Err(());
         }
         let ch = source::charCodeAt(acorn_pos);
         if ch == quote {
@@ -276,7 +277,7 @@ pub fn readString(start: i32, quote: i32) -> String {
         // '\'
         if ch == 92 {
             pushChunk(&mut out, chunkStart, acorn_pos);
-            out.extend(readEscapedChar(template));
+            out.extend(readEscapedChar(template)?);
             chunkStart = unsafe { acornPos };
         } else if ch == 0x2028 || ch == 0x2029 {
             unsafe { acornPos += 1 };
@@ -292,7 +293,7 @@ pub fn readString(start: i32, quote: i32) -> String {
         } else {
             // raw line breaks are only permitted inside template literals
             if helper::isBr(ch) && !template {
-                helper::syntaxError();
+                return Err(());
             }
             unsafe { acornPos += 1 };
         }
@@ -300,7 +301,7 @@ pub fn readString(start: i32, quote: i32) -> String {
     let acorn_pos = unsafe { acornPos };
     pushChunk(&mut out, chunkStart, acorn_pos);
     unsafe { acornPos += 1 };
-    return String::from_utf16_lossy(&out);
+    return Ok(String::from_utf16_lossy(&out));
 }
 
 #[allow(non_snake_case)]
@@ -312,46 +313,46 @@ fn pushChunk(out: &mut Vec<u16>, start: i32, end: i32) {
 // strings (octal escapes allowed); template literals reject \8, \9 and octal
 // escapes (eval throws, the caller maps that to None).
 #[allow(non_snake_case)]
-fn readEscapedChar(template: bool) -> Vec<u16> {
+fn readEscapedChar(template: bool) -> Result<Vec<u16>, ()> {
     unsafe { acornPos += 1 };
     let ch = source::charCodeAt(unsafe { acornPos });
     unsafe { acornPos += 1 };
     match ch {
-        110 => return vec![10], // 'n' -> '\n'
-        114 => return vec![13], // 'r' -> '\r'
-        120 => return vec![readHexChar(2) as u16], // 'x'
+        110 => return Ok(vec![10]), // 'n' -> '\n'
+        114 => return Ok(vec![13]), // 'r' -> '\r'
+        120 => return Ok(vec![readHexChar(2)? as u16]), // 'x'
         117 => return readCodePointToString(), // 'u'
-        116 => return vec![9],  // 't' -> '\t'
-        98 => return vec![8],   // 'b' -> '\b'
-        118 => return vec![11], // 'v' -> '\u000b'
-        102 => return vec![12], // 'f' -> '\f'
+        116 => return Ok(vec![9]),  // 't' -> '\t'
+        98 => return Ok(vec![8]),   // 'b' -> '\b'
+        118 => return Ok(vec![11]), // 'v' -> '\u000b'
+        102 => return Ok(vec![12]), // 'f' -> '\f'
         13 => {
             if source::charCodeAt(unsafe { acornPos }) == 10 {
                 unsafe { acornPos += 1 }; // '\r\n'
             }
-            return vec![];
+            return Ok(vec![]);
         }
-        10 => return vec![], // ' \n'
+        10 => return Ok(vec![]), // ' \n'
         // '\8' / '\9': literal chars in sloppy strings, errors in templates
         56 | 57 => {
             if template {
-                helper::syntaxError();
+                return Err(());
             }
-            return vec![ch as u16];
+            return Ok(vec![ch as u16]);
         }
         _ => {
             if ch >= 48 && ch <= 55 {
                 if template {
-                    helper::syntaxError();
+                    return Err(());
                 }
-                return readOctalChar();
+                return Ok(readOctalChar());
             }
             if helper::isBr(ch) {
                 // Unicode new line characters after \ get removed from output in both
                 // template literals and strings
-                return vec![];
+                return Ok(vec![]);
             }
-            return vec![ch as u16];
+            return Ok(vec![ch as u16]);
         }
     }
 }
@@ -386,7 +387,7 @@ fn readOctalChar() -> Vec<u16> {
 
 // Used to read character escape sequences ('\x', '\u', '\U').
 #[allow(non_snake_case)]
-fn readHexChar(len: i32) -> u32 {
+fn readHexChar(len: i32) -> Result<u32, ()> {
     let start = unsafe { acornPos };
     let mut total: u32 = 0;
     let mut lastCode: i32 = 0;
@@ -395,7 +396,7 @@ fn readHexChar(len: i32) -> u32 {
         let code = source::charCodeAt(unsafe { acornPos });
         if code == 95 {
             if lastCode == 95 || i == 0 {
-                helper::syntaxError();
+                return Err(());
             }
             lastCode = code;
             unsafe { acornPos += 1 };
@@ -421,14 +422,14 @@ fn readHexChar(len: i32) -> u32 {
         i += 1;
     }
     if lastCode == 95 || unsafe { acornPos } - start != len {
-        helper::syntaxError();
+        return Err(());
     }
-    return total;
+    return Ok(total);
 }
 
 // Read a string value, interpreting backslash-escapes.
 #[allow(non_snake_case)]
-fn readCodePointToString() -> Vec<u16> {
+fn readCodePointToString() -> Result<Vec<u16>, ()> {
     let ch = source::charCodeAt(unsafe { acornPos });
     let code: u32;
     // '{'
@@ -437,26 +438,26 @@ fn readCodePointToString() -> Vec<u16> {
         let close = indexOfCloseBrace(unsafe { acornPos });
         match close {
             // 空码点 \u{}：eval 抛 Invalid Unicode escape sequence，不能解成 \0
-            Some(close) if close == unsafe { acornPos } => helper::syntaxError(),
+            Some(close) if close == unsafe { acornPos } => return Err(()),
             Some(close) => {
-                code = readHexChar(close - unsafe { acornPos });
+                code = readHexChar(close - unsafe { acornPos })?;
             }
             // JS: indexOf returns -1, giving a negative len that fails readHexChar
-            None => helper::syntaxError(),
+            None => return Err(()),
         }
         unsafe { acornPos += 1 };
         if code > 0x10ffff {
-            helper::syntaxError();
+            return Err(());
         }
     } else {
-        code = readHexChar(4);
+        code = readHexChar(4)?;
     }
     // UTF-16 Decoding
     if code <= 0xffff {
-        return vec![code as u16];
+        return Ok(vec![code as u16]);
     }
     let code = code - 0x10000;
-    return vec![((code >> 10) + 0xd800) as u16, ((code & 1023) + 0xdc00) as u16];
+    return Ok(vec![((code >> 10) + 0xd800) as u16, ((code & 1023) + 0xdc00) as u16]);
 }
 
 #[allow(non_snake_case)]
