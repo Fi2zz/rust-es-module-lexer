@@ -64,7 +64,20 @@ fn test_parse_matches_reference() {
     .expect("parse expected.json");
     assert_eq!(cases.len(), expected.len(), "case count mismatch");
 
-    for (case, exp) in cases.iter().zip(expected.iter()) {
+    let mut all: Vec<(Case, Expected)> = cases.into_iter().zip(expected).collect();
+    // JSX 扩展用例（无上游基准，期望值为人工核对后的本实现输出）
+    let jsx_cases: Vec<Case> = serde_json::from_str(
+        &std::fs::read_to_string("testdata/jsx_cases.json").expect("read jsx_cases.json"),
+    )
+    .expect("parse jsx_cases.json");
+    let jsx_expected: Vec<Expected> = serde_json::from_str(
+        &std::fs::read_to_string("testdata/jsx_expected.json").expect("read jsx_expected.json"),
+    )
+    .expect("parse jsx_expected.json");
+    assert_eq!(jsx_cases.len(), jsx_expected.len(), "jsx case count mismatch");
+    all.extend(jsx_cases.into_iter().zip(jsx_expected));
+
+    for (case, exp) in all.iter() {
         assert_eq!(case.name, exp.name, "case order mismatch");
 
         let source = case.source.clone();

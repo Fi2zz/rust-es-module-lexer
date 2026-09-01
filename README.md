@@ -128,9 +128,32 @@ facade === true;
 - Division operator / regex token ambiguity is handled via backtracking checks against punctuator prefixes, including closing brace or paren backtracking.
 - Always correctly parses valid JS source, but may parse invalid JS source without errors.
 
+### JSX Support
+
+Unlike upstream es-module-lexer, JSX is supported and always enabled (no flag).
+Rationale: in valid JS, `<` as a binary operator always follows a value token,
+so a `<` in expression position (the same positions where a regex can start)
+cannot occur in valid JS — it can only be JSX. The 254-case baseline (valid JS)
+serves as the no-regression guard for this rule.
+
+The JSX scanner only guarantees: no parse errors, correct top-level
+import/export extraction, and no contamination of string/template/comment/regex
+token state by JSX content (e.g. apostrophes and slashes in JSX text). It does
+not validate tag pairing and produces no JSX structure information.
+
+Expression containers `{...}` (including spread attributes) reuse the main
+brace-stack machinery, so strings, templates with `${...}`, comments, regexes
+and nested JSX inside containers are all lexed normally.
+
 ### Limitations
 
 The lexing approach is designed to deal with the full language grammar including RegEx / division operator ambiguity through backtracking and paren / brace tracking.
+
+- TSX-style generic parameters are not supported: `useRef<T>(null)` is safe
+  (its `<` follows an identifier, so it reads as comparison), but
+  `const f = <T>(v) => v` enters JSX at `<` and may swallow the rest of the
+  file as JSX content.
+- Unterminated JSX at EOF is tolerated (scanning stops silently, no error).
 
 The only limitation to the reduced parser is that the "exports" list may not correctly gather all export identifiers in the following edge cases:
 

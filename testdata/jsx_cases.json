@@ -1,0 +1,98 @@
+[
+  {
+    "name": "jsx_simple",
+    "source": "import React from 'react';\nexport const App = () => <div>hello</div>;\n"
+  },
+  {
+    "name": "jsx_closing_tag",
+    "source": "import React from 'react';\nconst App = () => <div>content</div>;\nexport default App;\nexport const extra = 1;\n"
+  },
+  {
+    "name": "jsx_apostrophe",
+    "source": "import React from 'react';\nconst App = () => <div>don't</div>;\nexport default App;\n"
+  },
+  {
+    "name": "jsx_attrs",
+    "source": "import React from 'react';\nimport { x } from './x';\nconst App = (p) => (\n  <div className=\"a\" onClick={() => p.go()} {...rest}>\n    <span>{p.name}</span>\n  </div>\n);\nexport { App };\nexport const y = 2;\n"
+  },
+  {
+    "name": "jsx_comparison",
+    "source": "import x from 'x';\nconst ok = a < b && c > d;\nexport { ok };\n"
+  },
+  {
+    "name": "jsx_generic_tsx_limitation",
+    "source": "import x from 'x';\nconst f = <T>(v: T) => v;\nexport { f };\n"
+  },
+  {
+    "name": "jsx_text_special_chars",
+    "source": "import x from 'x';\nconst C = () => <p>say \"hi\" / it's `fine` </p>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_attr_variants",
+    "source": "import x from 'x';\nconst C = () => <input type='text' value={v} {...rest} data-id=\"1\" ns:attr disabled />;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_nested_same_name",
+    "source": "import x from 'x';\nconst C = () => <div><div><div>deep</div></div></div>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_fragment",
+    "source": "import x from 'x';\nconst C = () => <><span>a</span><span>b</span></>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_container_rich",
+    "source": "import x from 'x';\nconst C = () => <div>{items.filter(i => /x+/.test(i)).map(i => `v${i}`)}{/* comment */}{\"str\"}</div>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_nested_in_container",
+    "source": "import x from 'x';\nconst C = () => <div>{cond && <B msg=\"hi\"/>}</div>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_self_closing_member",
+    "source": "import x from 'x';\nconst C = () => <div><br/><Foo.Bar /></div>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_export_default_component",
+    "source": "import React from 'react';\nexport default function App() {\n  return <main><h1>Title</h1></main>;\n}\n"
+  },
+  {
+    "name": "jsx_shift_ops",
+    "source": "import x from 'x';\nconst a = 1 << 2;\nconst b = a << 3 >> 1;\nexport { a, b };\n"
+  },
+  {
+    "name": "jsx_compare_chain",
+    "source": "import x from 'x';\nconst ok = a < b > c;\nexport { ok };\n"
+  },
+  {
+    "name": "jsx_export_init",
+    "source": "import x from 'x';\nexport const Icon = <svg/>;\nexport const n = 1;\n"
+  },
+  {
+    "name": "jsx_at_file_start",
+    "source": "<div/>\nimport x from 'x';\nexport const n = 1;\n"
+  },
+  {
+    "name": "jsx_container_ternary",
+    "source": "import x from 'x';\nconst C = () => <div>{a ? { b: 1 } : <C2/>}</div>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_unterminated_eof",
+    "source": "import x from 'x';\nconst C = () => <div className=\"x\n"
+  },
+  {
+    "name": "jsx_regex_then_jsx",
+    "source": "import x from 'x';\nconst ok = /re/.test(s);\nconst C = () => <div/>;\nexport { C };\n"
+  },
+  {
+    "name": "jsx_realistic_counter",
+    "source": "import React, { useState } from 'react';\nimport { formatLabel } from './util';\n\nexport function Counter({ initial }) {\n  const [count, setCount] = useState(initial);\n  return (\n    <div className=\"counter\">\n      <h1>It's been {count} clicks</h1>\n      <button onClick={() => setCount(count + 1)}>\n        Click \"me\" / now\n      </button>\n      <ul>\n        {items.map((item) => (\n          <li key={item.id}>{formatLabel(item)}</li>\n        ))}\n      </ul>\n    </div>\n  );\n}\n\nexport default Counter;\n"
+  },
+  {
+    "name": "jsx_realistic_fetch",
+    "source": "import { useEffect, useState } from 'react';\nimport styles from './styles.css' with { type: 'css' };\n\nexport const UserCard = ({ id }) => {\n  const [user, setUser] = useState(null);\n  useEffect(() => {\n    fetch(`/api/users/${id}`).then((r) => r.json()).then(setUser);\n  }, [id]);\n  if (!user) return <div data-state=\"loading\">Loading…</div>;\n  return (\n    <section className={styles.card}>\n      {/* 头部 */}\n      <h2>{user.name}</h2>\n      {user.admin && <Badge text=\"admin's\" />}\n    </section>\n  );\n};\n"
+  },
+  {
+    "name": "jsx_realistic_form",
+    "source": "import React from 'react';\nimport { validate } from './validate';\n\nexport default function LoginForm() {\n  const [email, setEmail] = React.useState('');\n  const onSubmit = (e) => {\n    e.preventDefault();\n    if (!validate(email)) return;\n  };\n  return (\n    <form onSubmit={onSubmit}>\n      <label htmlFor=\"email\">\n        Don't worry, we'll never share it.\n      </label>\n      <input\n        id=\"email\"\n        type=\"email\"\n        value={email}\n        onChange={(e) => setEmail(e.target.value)}\n        placeholder=\"you@example.com\"\n      />\n      <button type=\"submit\">Sign in</button>\n    </form>\n  );\n}\n"
+  }
+]

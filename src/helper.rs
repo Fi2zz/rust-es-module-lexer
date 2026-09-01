@@ -122,7 +122,7 @@ pub fn isTokenRunChar(ch: i32) -> bool {
         true
     }
 }
-// consumeToken 的 switch case 字符集（e i c ( [ ] , ) { } ' " / `），
+// consumeToken 的 switch case 字符集（e i c ( [ ] , ) { } ' " / ` <），
 // 主循环快路径用它区分"无需分发"的普通字符
 #[allow(non_upper_case_globals)]
 static CONSUME_CASE_TABLE: [bool; 128] = {
@@ -141,6 +141,7 @@ static CONSUME_CASE_TABLE: [bool; 128] = {
     table[34] = true; // "
     table[47] = true; // /
     table[96] = true; // `
+    table[60] = true; // <（JSX 表达式位置判定）
     table
 };
 #[allow(non_snake_case)]

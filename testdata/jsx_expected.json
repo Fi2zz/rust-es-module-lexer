@@ -1,0 +1,772 @@
+[
+  {
+    "name": "jsx_simple",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 25,
+        "s": 19,
+        "e": 24,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 40,
+        "e": 43,
+        "ls": 40,
+        "le": 43,
+        "ss": 27,
+        "n": "App",
+        "ln": "App"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_closing_tag",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 25,
+        "s": 19,
+        "e": 24,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 72,
+        "e": 79,
+        "ls": -1,
+        "le": -1,
+        "ss": 65,
+        "n": "default",
+        "ln": null
+      },
+      {
+        "s": 98,
+        "e": 103,
+        "ls": 98,
+        "le": 103,
+        "ss": 85,
+        "n": "extra",
+        "ln": "extra"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_apostrophe",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 25,
+        "s": 19,
+        "e": 24,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 70,
+        "e": 77,
+        "ls": -1,
+        "le": -1,
+        "ss": 63,
+        "n": "default",
+        "ln": null
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_attrs",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 25,
+        "s": 19,
+        "e": 24,
+        "a": -1,
+        "d": -1,
+        "at": null
+      },
+      {
+        "n": "./x",
+        "t": 1,
+        "ss": 27,
+        "se": 50,
+        "s": 46,
+        "e": 49,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 175,
+        "e": 178,
+        "ls": 175,
+        "le": 178,
+        "ss": 166,
+        "n": "App",
+        "ln": "App"
+      },
+      {
+        "s": 195,
+        "e": 196,
+        "ls": 195,
+        "le": 196,
+        "ss": 182,
+        "n": "y",
+        "ln": "y"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_comparison",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 55,
+        "e": 57,
+        "ls": 55,
+        "le": 57,
+        "ss": 46,
+        "n": "ok",
+        "ln": "ok"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_generic_tsx_limitation",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "jsx_text_special_chars",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 76,
+        "e": 77,
+        "ls": 76,
+        "le": 77,
+        "ss": 67,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_attr_variants",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 116,
+        "e": 117,
+        "ls": 116,
+        "le": 117,
+        "ss": 107,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_nested_same_name",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 83,
+        "e": 84,
+        "ls": 83,
+        "le": 84,
+        "ss": 74,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_fragment",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 79,
+        "e": 80,
+        "ls": 79,
+        "le": 80,
+        "ss": 70,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_container_rich",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 130,
+        "e": 131,
+        "ls": 130,
+        "le": 131,
+        "ss": 121,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_nested_in_container",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 80,
+        "e": 81,
+        "ls": 80,
+        "le": 81,
+        "ss": 71,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_self_closing_member",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 73,
+        "e": 74,
+        "ls": 73,
+        "le": 74,
+        "ss": 64,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_export_default_component",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 25,
+        "s": 19,
+        "e": 24,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 34,
+        "e": 41,
+        "ls": 51,
+        "le": 54,
+        "ss": 27,
+        "n": "default",
+        "ln": "App"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_shift_ops",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 69,
+        "e": 70,
+        "ls": 69,
+        "le": 70,
+        "ss": 60,
+        "n": "a",
+        "ln": "a"
+      },
+      {
+        "s": 72,
+        "e": 73,
+        "ls": 72,
+        "le": 73,
+        "ss": 60,
+        "n": "b",
+        "ln": "b"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_compare_chain",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 50,
+        "e": 52,
+        "ls": 50,
+        "le": 52,
+        "ss": 41,
+        "n": "ok",
+        "ln": "ok"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_export_init",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 32,
+        "e": 36,
+        "ls": 32,
+        "le": 36,
+        "ss": 19,
+        "n": "Icon",
+        "ln": "Icon"
+      },
+      {
+        "s": 60,
+        "e": 61,
+        "ls": 60,
+        "le": 61,
+        "ss": 47,
+        "n": "n",
+        "ln": "n"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_at_file_start",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 7,
+        "se": 24,
+        "s": 22,
+        "e": 23,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 39,
+        "e": 40,
+        "ls": 39,
+        "le": 40,
+        "ss": 26,
+        "n": "n",
+        "ln": "n"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_container_ternary",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 79,
+        "e": 80,
+        "ls": 79,
+        "le": 80,
+        "ss": 70,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_unterminated_eof",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [],
+    "facade": false
+  },
+  {
+    "name": "jsx_regex_then_jsx",
+    "ok": true,
+    "imports": [
+      {
+        "n": "x",
+        "t": 1,
+        "ss": 0,
+        "se": 17,
+        "s": 15,
+        "e": 16,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 77,
+        "e": 78,
+        "ls": 77,
+        "le": 78,
+        "ss": 68,
+        "n": "C",
+        "ln": "C"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_realistic_counter",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 39,
+        "s": 33,
+        "e": 38,
+        "a": -1,
+        "d": -1,
+        "at": null
+      },
+      {
+        "n": "./util",
+        "t": 1,
+        "ss": 41,
+        "se": 77,
+        "s": 70,
+        "e": 76,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 96,
+        "e": 103,
+        "ls": 96,
+        "le": 103,
+        "ss": 80,
+        "n": "Counter",
+        "ln": "Counter"
+      },
+      {
+        "s": 484,
+        "e": 491,
+        "ls": -1,
+        "le": -1,
+        "ss": 477,
+        "n": "default",
+        "ln": null
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_realistic_fetch",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 43,
+        "s": 37,
+        "e": 42,
+        "a": -1,
+        "d": -1,
+        "at": null
+      },
+      {
+        "n": "./styles.css",
+        "t": 1,
+        "ss": 45,
+        "se": 99,
+        "s": 65,
+        "e": 77,
+        "a": 84,
+        "d": -1,
+        "at": [
+          [
+            "type",
+            "css"
+          ]
+        ]
+      }
+    ],
+    "exports": [
+      {
+        "s": 115,
+        "e": 123,
+        "ls": 115,
+        "le": 123,
+        "ss": 102,
+        "n": "UserCard",
+        "ln": "UserCard"
+      }
+    ],
+    "facade": false
+  },
+  {
+    "name": "jsx_realistic_form",
+    "ok": true,
+    "imports": [
+      {
+        "n": "react",
+        "t": 1,
+        "ss": 0,
+        "se": 25,
+        "s": 19,
+        "e": 24,
+        "a": -1,
+        "d": -1,
+        "at": null
+      },
+      {
+        "n": "./validate",
+        "t": 1,
+        "ss": 27,
+        "se": 64,
+        "s": 53,
+        "e": 63,
+        "a": -1,
+        "d": -1,
+        "at": null
+      }
+    ],
+    "exports": [
+      {
+        "s": 74,
+        "e": 81,
+        "ls": 91,
+        "le": 100,
+        "ss": 67,
+        "n": "default",
+        "ln": "LoginForm"
+      }
+    ],
+    "facade": false
+  }
+]

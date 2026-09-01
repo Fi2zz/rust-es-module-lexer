@@ -35,6 +35,9 @@ pub static mut lastSlashWasDivision: bool = false;
 pub static mut facade: bool = true;
 #[allow(non_upper_case_globals)]
 pub static mut lastTokenPos: i32 = -1;
+// JSX 区内容错退出（EOF 或扫描异常）时置位，parse 末尾的栈平衡检查放行
+#[allow(non_upper_case_globals)]
+pub static mut jsxTolerantEof: bool = false;
 #[allow(non_upper_case_globals)]
 static mut acornPos: i32 = 0;
 
@@ -46,6 +49,7 @@ pub fn reset() {
         lastTokenPos = -1;
         lastSlashWasDivision = false;
         nextBraceIsClass = false;
+        jsxTolerantEof = false;
     }
 }
 

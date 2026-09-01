@@ -21,7 +21,9 @@ pub fn parse() -> ParseResult {
     mainParse();
 
     unsafe {
-        if lexer::openTokenDepth != 0 || import::dynamicImportStackLen() != 0 {
+        if !lexer::jsxTolerantEof
+            && (lexer::openTokenDepth != 0 || import::dynamicImportStackLen() != 0)
+        {
             syntaxError();
         }
     }
@@ -210,6 +212,14 @@ pub fn consumeToken(pos: i32, ch: i32) -> i32 {
         44 => pos = commaToken(pos),
         /*)*/
         41 => closeParen(pos),
+        /*<*/ // JSX：仅当 '<' 处于表达式位置时进入（合法 JS 不受影响）
+        60 => {
+            if ltStartsJsx() {
+                position::setPos(pos);
+                crate::jsx::jsxScanTolerant();
+                pos = position::position();
+            }
+        }
         /*{*/
         123 => openBrace(),
         /*}*/
@@ -343,6 +353,17 @@ fn openBrace() {
         lexer::openTokenDepth += 1;
         lexer::nextBraceIsClass = false;
     }
+}
+
+// JSX 入口判定（jsx 扩展，上游无此逻辑）：合法 JS 中 '<' 作为二元运算符必有
+// 左操作数，即其前一个 token 必为值；所以表达式位置（与正则起点同一套判定）
+// 出现的 '<' 只会是 JSX。`<<` 移位除外（前一字符是 '<'）。
+#[allow(non_snake_case)]
+fn ltStartsJsx() -> bool {
+    if source::charCodeAt(unsafe { lexer::lastTokenPos }) == 60 {
+        return false;
+    }
+    slashStartsRegex() || export::lastExportCovers(unsafe { lexer::lastTokenPos })
 }
 
 // Division / regex ambiguity + comment dispatch, shared so skipExpression

@@ -4,6 +4,7 @@ pub mod comment;
 pub mod export;
 pub mod helper;
 pub mod import;
+pub mod jsx;
 pub mod lexer;
 pub mod parse;
 pub mod position;
