@@ -59,6 +59,7 @@ pub fn getFacade() -> bool {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn stringIteral(quote: i32) {
     // 局部游标扫描；pos 循环内最多走到 end + 1，预读 pos + 1 最多 end + 2，
     // 都在哨兵范围内（charCodeAtUnchecked 安全）
@@ -91,6 +92,7 @@ pub fn stringIteral(quote: i32) {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn templateString() {
     let end = source::end();
     let mut pos = position::position();
@@ -136,6 +138,7 @@ pub fn templateString() {
 // On a substitution or EOF restores pos and returns false, leaving the literal
 // to the main loop's template handling.
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn noSubstitutionTemplate() -> bool {
     let startPos = position::position();
     let end = source::end();
@@ -166,6 +169,7 @@ pub fn noSubstitutionTemplate() -> bool {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn regexCharacterClass() {
     let end = source::end();
     let mut pos = position::position();
@@ -192,6 +196,7 @@ pub fn regexCharacterClass() {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn regularExpression() {
     let end = source::end();
     let mut pos = position::position();
@@ -222,6 +227,7 @@ pub fn regularExpression() {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn readToWsOrPunctuator(ch: i32) -> i32 {
     // C: do { ... } while (ch = *(++pos)) —— 读到 null 终止符（哨兵 0）停止
     let mut ch = ch;

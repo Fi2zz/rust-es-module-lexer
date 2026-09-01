@@ -148,6 +148,7 @@ fn mainParse() {
 // （tryParse*/stringIteral/templateString/handleSlash）的分支才临时同步全局
 // _pos，纯栈操作的分支（( ) [ ] { } ,）完全不碰 _pos。
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn consumeToken(pos: i32, ch: i32) -> i32 {
     let mut pos = pos;
     let mut isComment = false;
@@ -278,6 +279,7 @@ pub fn consumeToken(pos: i32, ch: i32) -> i32 {
 // C: while (isTokenRunChar(*(pos + 1))) pos++;
 // pos == end 时 C 读到 null 终止符（0），不是 token run char，同样停止
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 fn skipTokenRunFrom(pos: i32) -> i32 {
     let end = source::end();
     let mut pos = pos;
@@ -288,6 +290,7 @@ fn skipTokenRunFrom(pos: i32) -> i32 {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 fn commaToken(pos: i32) -> i32 {
     unsafe {
         if import::dynamicImportStackLen() > 0
@@ -311,6 +314,7 @@ fn commaToken(pos: i32) -> i32 {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 fn closeParen(pos: i32) {
     unsafe {
         if lexer::openTokenDepth == 0 {
@@ -332,6 +336,7 @@ fn closeParen(pos: i32) {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 fn openBrace() {
     unsafe {
         // dynamic import followed by { is not a dynamic import (so remove)
@@ -372,6 +377,7 @@ fn ltStartsJsx() -> bool {
 // resolves '/' with the exact main-loop logic. Returns true for a comment
 // (caller must not update lastTokenPos).
 #[allow(non_snake_case)]
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 fn handleSlash() -> bool {
     let next_ch = source::charCodeAt(position::position() + 1);
     if next_ch == 47 {

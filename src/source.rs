@@ -19,10 +19,25 @@ pub fn setSource(inputSource: &str) {
         source = units;
     }
 }
+// 快速通道：直接接管一块已填充的 UTF-16 缓冲（wasm lex_alloc/lex_parse_at），
+// 零拷贝零转码。buf 长度 = units + 4，尾部 4 个哨兵位在此清零。
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+pub fn setSourceUtf16(mut buf: Vec<u16>, units: usize) {
+    unsafe {
+        for i in units..units + 4 {
+            buf[i] = 0;
+        }
+        SOURCE_LEN = units as i32;
+        source = buf;
+    }
+}
 // C: end = source + sourceLen - 1（最后一个真实字符）
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn end() -> i32 {
     unsafe { SOURCE_LEN - 1 }
 }
+#[cfg_attr(target_arch = "wasm32", inline(always))]
 pub fn len() -> i32 {
     unsafe { SOURCE_LEN }
 }

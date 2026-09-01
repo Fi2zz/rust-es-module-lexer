@@ -128,6 +128,25 @@ import { parse } from "./pkg/bundler";
 const [imports, exports, facade] = parse(source);
 ```
 
+Fast path (recommended for bulk workloads): JS strings are already UTF-16, so
+skip the UTF-8 roundtrip of `parse(source)` by writing straight into wasm
+memory. `lex_parse_at` returns a JSON string (cheaper than constructing
+hundreds of JS objects across the wasm↔JS boundary; `JSON.parse` in V8 is
+very fast):
+
+```js
+const lex = require("./pkg/nodejs");
+
+const units = source.length;            // UTF-16 code units
+const ptr = lex.lex_alloc(units);       // allocate inside wasm memory
+Buffer.from(lex.lex_memory().buffer, ptr, units * 2).write(source, "utf16le");
+const [imports, exports, facade] = JSON.parse(lex.lex_parse_at(ptr, units));
+```
+
+With this path the wasm build matches upstream es-module-lexer's wasm
+(`scripts/bench_wasm.cjs`: ~1.0x); the plain `parse(source)` path pays a
+UTF-8 copy + transcode and is ~1.8x slower on large files.
+
 API correspondence with upstream es-module-lexer 2.x: same `[imports, exports,
 facade]` triple and field names; import phases (`t`), import attributes (`at`,
 `with { ... }` only) and the `ls/le/ln/ss` export fields follow upstream 2.3.2.
@@ -138,7 +157,7 @@ name:line:col` + `idx` shape; no `hasModuleSyntax` fourth return value.
 Run the end-to-end corpus against the Node build:
 
 ```sh
-node scripts/test_wasm.cjs   # 278 cases, compared field-by-field with testdata expectations
+node scripts/test_wasm.cjs   # 278 cases x both entry points, field-by-field
 ```
 
 ### Limitations
